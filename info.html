@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Info — MigYo™</title>
+<meta name="description" content="Graphic designer and visual artist based in England.">
+<style>
+  @import url('https://fonts.bunny.net/css?family=inter-display:300,400,500,600&display=swap');
+
+  :root { --bg:#000000; --fg:#f5f5f5; --fg-dim:#545454; --border:#2a2a2a; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#ffffff; --fg:#0a0a0a; --fg-dim:#999999; --border:#e0e0e0; }
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  html { scrollbar-width:none; -ms-overflow-style:none; background:var(--bg); height:100%; overscroll-behavior:none; }
+  ::-webkit-scrollbar { display:none; width:0; height:0; }
+
+  html, body {
+    background:var(--bg);
+    color:var(--fg);
+    font-family:'Inter Display','Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    font-weight:400;
+    font-size:14px;
+    letter-spacing:-0.01em;
+    min-height:100vh;
+    overscroll-behavior:none;
+  }
+
+  body { display:flex; flex-direction:column; justify-content:space-between; }
+
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(128,128,128,0.4); }
+
+  .page {
+    max-width:600px;
+    width:100%;
+    margin:0 auto;
+    padding:60px 16px 0;
+    flex:1;
+  }
+
+  /* Go back — same icon/style as the project pages, positioned top-left */
+  .back-link { display:inline-block; color:var(--fg-dim); font-size:14px; line-height:17px; transition:color 0.3s ease; }
+  .back-link:hover { color:var(--fg); }
+
+  .rows { margin-top:40px; }
+
+  .row { display:grid; grid-template-columns:60px 1fr; margin-bottom:40px; }
+  .num { color:var(--fg-dim); line-height:17px; }
+  .text { max-width:400px; line-height:17px; overflow-wrap:break-word; }
+  .text p + p { margin-top:16px; }
+  .text a { color:var(--fg); transition:color 0.3s ease; }
+  .text a:hover { color:var(--fg-dim); }
+
+  .footer {
+    max-width:600px;
+    width:100%;
+    margin:0 auto;
+    padding:40px 16px 60px;
+    display:flex;
+    gap:18px;
+    align-items:center;
+  }
+  .footer a { color:var(--fg); transition:color 0.3s ease; }
+  .footer a:hover { color:var(--fg-dim); }
+  .footer .location { color:var(--fg-dim); }
+
+  .fade-in-up { opacity:0; transform:translateY(16px); animation:fadeInUp 0.5s cubic-bezier(0.33,1,0.68,1) forwards; }
+  @keyframes fadeInUp { to { opacity:1; transform:translateY(0); } }
+
+  @media (max-width: 640px) {
+    .page { padding:16px 16px 0; }
+    .footer { padding:16px; }
+    .rows { margin-top:32px; }
+    .row { grid-template-columns:48px 1fr; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="page">
+    <a href="/" class="back-link fade-in-up" style="animation-delay:0s">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 18 18" style="vertical-align:middle;margin-right:6px;position:relative;top:-1px"><path d="M2.25,6.25H12c2.071,0,3.75,1.679,3.75,3.75h0c0,2.071-1.679,3.75-3.75,3.75h-3.75" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path><polyline points="5.75 9.75 2.25 6.25 5.75 2.75" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></polyline></svg>Go Back
+    </a>
+
+    <div class="rows">
+      <div class="row fade-in-up" style="animation-delay:0.1s">
+        <div class="num">01</div>
+        <div class="text">
+          <p>Graphic designer and visual artist based in England. With over three years of experience across brand identity, art direction, product design, and digital illustration.</p>
+          <p>I built and maintained an independent art platform of over 200,000 followers, working with hundreds of clients across a broad range of projects.</p>
+        </div>
+      </div>
+
+      <div class="row fade-in-up" style="animation-delay:0.2s">
+        <div class="num">02</div>
+        <div class="text">
+          UI/UX Design<br>
+          Brand Design<br>
+          Art Direction<br>
+          Creative Collaboration<br>
+          Client Management<br>
+          App Development
+        </div>
+      </div>
+
+      <div class="row fade-in-up" style="animation-delay:0.3s">
+        <div class="num">03</div>
+        <div class="text"><a href="mailto:contact@migyo.uk">contact@migyo.uk</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer fade-in-up" style="animation-delay:0.4s">
+    <a href="mailto:contact@migyo.uk">Contact</a>
+    <a href="/info">Info</a>
+    <span class="location">London, England</span>
+  </div>
+
+</body>
+</html>
