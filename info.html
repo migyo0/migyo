@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Info</title>
+<meta name="description" content="Graphic designer and visual artist based in England.">
+<style>
+  @import url('https://fonts.bunny.net/css?family=inter-display:300,400,500,600&display=swap');
+
+  :root { --bg:#000000; --fg:#f5f5f5; --fg-dim:#545454; --border:#2a2a2a; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#ffffff; --fg:#0a0a0a; --fg-dim:#999999; --border:#e0e0e0; }
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  html { scrollbar-width:none; -ms-overflow-style:none; background:var(--bg); height:100%; overscroll-behavior:none; }
+  ::-webkit-scrollbar { display:none; width:0; height:0; }
+
+  html, body {
+    background:var(--bg);
+    color:var(--fg);
+    font-family:'Inter Display','Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    font-weight:400;
+    font-size:14px;
+    letter-spacing:-0.01em;
+    min-height:100vh;
+    overscroll-behavior:none;
+  }
+
+  body { display:flex; flex-direction:column; justify-content:space-between; }
+
+  a { color:inherit; text-decoration:none; }
+  ::selection { background:rgba(128,128,128,0.4); }
+
+  .page {
+    max-width:600px;
+    width:100%;
+    margin:0 auto;
+    padding:60px 16px 0;
+    flex:1;
+  }
+
+  /* Go back — same icon/style as the project pages, positioned top-left */
+  .back-link { display:inline-block; color:var(--fg-dim); font-size:14px; line-height:17px; transition:color 0.3s ease; }
+  .back-link:hover { color:var(--fg); }
+
+  .rows { margin-top:40px; }
+
+  .row { display:grid; grid-template-columns:60px 1fr; margin-bottom:40px; }
+  .num { color:var(--fg-dim); line-height:17px; }
+  .text { max-width:400px; line-height:17px; overflow-wrap:break-word; }
+  .text p + p { margin-top:16px; }
+  .text a { color:var(--fg); transition:color 0.3s ease; }
+  .text a:hover { color:var(--fg-dim); }
+
+  .footer {
+    max-width:600px;
+    width:100%;
+    margin:0 auto;
+    padding:40px 16px 60px;
+    display:flex;
+    gap:18px;
+    align-items:center;
+  }
+  .footer a { color:var(--fg); transition:color 0.3s ease; }
+  .footer a:hover { color:var(--fg-dim); }
+  .footer .location { color:var(--fg-dim); }
+
+  .fade-in-up { opacity:0; transform:translateY(16px); animation:fadeInUp 0.5s cubic-bezier(0.33,1,0.68,1) forwards; }
+  @keyframes fadeInUp { to { opacity:1; transform:translateY(0); } }
+
+
+  /* Followers link: dotted underline, dim-on-hover, tooltip bubble after 2s */
+  .followers-wrap { position:relative; display:inline; }
+  .followers-link { color:color-mix(in srgb, var(--fg) 80%, transparent); text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:3px; text-decoration-color:color-mix(in srgb, var(--fg) 30%, transparent); transition:color 0.3s ease; cursor:pointer; }
+  .followers-link:hover { color:var(--fg); }
+  .followers-bubble {
+    position:absolute; left:50%; bottom:calc(100% + 10px);
+    transform:translateX(-50%) translateY(6px) scale(0.92); transform-origin:bottom center;
+    background:var(--bg); color:var(--fg); border:1px solid var(--border);
+    font-family:inherit; font-style:italic; font-size:13px; line-height:1; letter-spacing:-0.01em; white-space:nowrap;
+    padding:8px 14px; border-radius:999px; pointer-events:none; opacity:0;
+    transition:opacity 0.25s ease, transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .followers-bubble::after {
+    content:''; position:absolute; left:50%; top:100%; width:8px; height:8px;
+    background:var(--bg); border-right:1px solid var(--border); border-bottom:1px solid var(--border); transform:translate(-50%,-50%) rotate(45deg); border-radius:1px;
+  }
+  .followers-bubble.show { opacity:1; transform:translateX(-50%) translateY(0) scale(1); }
+
+  @media (max-width: 640px) {
+    .page { padding:16px 16px 0; }
+    .footer { padding:16px; }
+    .rows { margin-top:32px; }
+    .row { grid-template-columns:48px 1fr; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="page">
+    <a href="/" class="back-link fade-in-up" style="animation-delay:0s">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 18 18" style="vertical-align:middle;margin-right:6px;position:relative;top:-1px"><path d="M2.25,6.25H12c2.071,0,3.75,1.679,3.75,3.75h0c0,2.071-1.679,3.75-3.75,3.75h-3.75" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path><polyline points="5.75 9.75 2.25 6.25 5.75 2.75" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></polyline></svg>Go Back
+    </a>
+
+    <div class="rows">
+      <div class="row fade-in-up" style="animation-delay:0.1s">
+        <div class="num">01</div>
+        <div class="text">
+          <p>Graphic designer and visual artist based in England. With over three years of experience across brand identity, art direction, product design, and digital illustration.</p>
+          <p>I built and maintained an independent art platform of over <span class="followers-wrap"><a href="https://www.instagram.com/titocolorr" target="_blank" rel="noopener" class="followers-link" id="followers-link">200,000 followers</a><span class="followers-bubble" id="followers-bubble">My Art Profile!</span></span> on all platforms, working with hundreds of clients across a broad range of projects.</p>
+        </div>
+      </div>
+
+      <div class="row fade-in-up" style="animation-delay:0.2s">
+        <div class="num">02</div>
+        <div class="text">
+          UI/UX Design<br>
+          Brand Design<br>
+          Art Direction<br>
+          Creative Collaboration<br>
+          Client Management<br>
+          App Development
+        </div>
+      </div>
+
+      <div class="row fade-in-up" style="animation-delay:0.3s">
+        <div class="num">03</div>
+        <div class="text"><a href="mailto:contact@migyo.uk">contact@migyo.uk</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer fade-in-up" style="animation-delay:0.4s">
+    <a href="mailto:contact@migyo.uk">Contact</a>
+    <a href="/info">Info</a>
+    <span class="location">London, England</span>
+  </div>
+
+
+<script>
+  (function(){
+    var link=document.getElementById('followers-link'), bubble=document.getElementById('followers-bubble'), t=null;
+    if(!link||!bubble) return;
+    link.addEventListener('mouseenter',function(){ t=setTimeout(function(){bubble.classList.add('show');},400); });
+    link.addEventListener('mouseleave',function(){ clearTimeout(t); bubble.classList.remove('show'); });
+  })();
+</script>
+</body>
+</html>
