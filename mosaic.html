@@ -72,11 +72,14 @@
   .phone-box.scaled-bottom { padding:0 0 40px; align-items:flex-end; }
   .phone-box.scaled-top .phone-frame, .phone-box.scaled-bottom .phone-frame { height:150%; }
   .phone-media { position:absolute; top:1.728%; bottom:1.728%; left:4.545%; right:4.545%; overflow:hidden; border-radius:15%/6.9%; background:#000; outline:2px solid #000; }
-  .phone-media video { transform:translateZ(0); backface-visibility:hidden; }
-  video.av-loading { animation: av-pulse 1.8s ease-in-out infinite; }
-  @keyframes av-pulse { 0%,100% { filter:brightness(1); } 50% { filter:brightness(1.25) saturate(0.85); } }
   .phone-media img, .phone-media video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+  .phone-media video { transform:translateZ(0); backface-visibility:hidden; }
   .av-loop { z-index:1; }
+  .video-tap-wrap { position:relative; display:block; }
+  .phone-media .video-tap-wrap { position:absolute; inset:0; width:100%; height:100%; }
+  .video-tap-btn { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:52px; height:52px; border-radius:50%; background:rgba(0,0,0,0.55); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; z-index:2; transition:background 0.2s ease; }
+  .video-tap-btn:hover { background:rgba(0,0,0,0.7); }
+  .video-tap-wrap.is-playing .video-tap-btn { display:none; }
   .phone-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 
   /* Page loader: a plain white overlay that fades away once the page is
@@ -172,7 +175,7 @@
     </div>
 
     <div class="section" id="section-4">
-      <div class="img-single"><video src="assets/mosaic-section-4-media-1.mp4" class="av-loop av-loading" muted loop playsinline preload="auto"></video></div>
+      <div class="img-single"><span class="video-tap-wrap"><video src="assets/mosaic-section-4-media-1.webm" class="av-loop" muted playsinline preload="auto"></video><button type="button" class="video-tap-btn" aria-label="Play video"><svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M8 5v14l11-7z"/></svg></button></span></div>
       
       
       
@@ -320,232 +323,94 @@
   })();
 
 
-  // ---- Only play videos while they're actually on screen ----
-  // .av-loop  = muted/looping background-style videos (phone mockup screens)
-  //             that should play automatically whenever visible.
-  // .av-controlled = videos with visible controls (section videos, video
-  //             embeds) — we never force these to start, but we do pause
-  //             them the moment they scroll out of view.
+  // ---- Uploaded video clips: tap-to-play on phones, play only while in
+  // view, loop reliably ----
+  // Two things this handles:
+  // 1. Tap-to-play on touch devices (a real tap is the one thing every
+  //    browser reliably allows playback on) — desktop just plays itself.
+  // 2. Only plays while actually scrolled into view; pauses otherwise.
   //
-  // Every real video file starts downloading its full bytes the instant
-  // the page loads — not gated by scroll position at all — via a plain
-  // fetch() swapped in as a local blob, so it's genuinely fully loaded
-  // and ready to play even if it's never been on screen yet, exactly
-  // like a video already embedded as a data URI. <link rel="preload"> is
-  // unreliable for video on mobile Safari, and a bare fetch() into the
-  // HTTP cache is only a hint the browser might use — a real blob swap
-  // is the only way to actually guarantee it.
-  //
-  // The key to doing this without breaking autoplay: a video is only
-  // ever handed to the IntersectionObserver (i.e. only ever becomes
-  // eligible for .play()) AFTER its own blob swap has finished. That
-  // makes the observer the single, sole trigger for playback for that
-  // video — there's no second load/reset ever racing against it, which
-  // is what caused inconsistent silent autoplay failures on mobile with
-  // an earlier version of this that tried to swap and play at the same
-  // time.
-  (function initVideos() {
-    var loopVideos = document.querySelectorAll('video.av-loop');
-    var allVideos = document.querySelectorAll('video.av-loop, video.av-controlled');
-    if (!allVideos.length) return;
+  // Looping is driven entirely by a watchdog poll, not by trusting any
+  // single event. Native "loop" and the 'ended' event both proved
+  // unreliable for video recorded via MediaRecorder (how the WebM
+  // conversion works) — in practice each restarted the clip exactly once
+  // and then silently stopped firing again. Rather than chase which event
+  // almost works, this just checks actual playback position directly a
+  // few times a second: if the clip should be playing but is paused,
+  // ended, at/past its duration, or simply hasn't advanced since the last
+  // check (frozen with no event fired at all), it's forced back to frame
+  // 0 and restarted. No event has to fire correctly for this to work.
+  (function initVideoTaps() {
+    var wraps = document.querySelectorAll('.video-tap-wrap');
+    if (!wraps.length) return;
 
-    // Track which loop videos are currently supposed to be playing (i.e.
-    // in view). The watchdog below uses this to tell an *intentional*
-    // pause (scrolled out of view) apart from an *unexpected* one — which
-    // is what actually makes looping reliable. It doesn't lean on the
-    // native "loop" attribute, container duration metadata, or "ended"
-    // firing correctly, none of which are dependable for clips that went
-    // through client-side re-encoding: whatever the reason playback
-    // stopped, if the video should still be visible and playing, we just
-    // restart it.
-    var shouldBePlaying = new WeakSet();
+    var isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    var hasIO = 'IntersectionObserver' in window;
 
-    loopVideos.forEach(function(v) {
-      // Set muted/inline via JS as well as attributes — some browsers only
-      // honour muted autoplay when the property itself is set.
-      v.muted = true;
-      v.defaultMuted = true;
-      v.playsInline = true;
+    wraps.forEach(function(wrap) {
+      var video = wrap.querySelector('video');
+      if (!video) return;
 
-      // Not ready to actually play until its blob copy has loaded (see the
-      // fetch/blob-swap below). Until then it should just sit still on its
-      // first frame — with .av-loading pulsing to show it's working —
-      // rather than flash-playing off the network src and then pausing.
-      v._blobReady = false;
-      v.pause();
-
-      v.addEventListener('playing', function() {
-        v.classList.remove('av-loading');
-      });
-
-      ['loadedmetadata', 'loadeddata', 'canplay'].forEach(function(evt) {
-        v.addEventListener(evt, function() {
-          if (v._blobReady && shouldBePlaying.has(v) && v.paused) v.play().catch(function(){});
-        });
-      });
-
-      v.addEventListener('ended', function() {
-        v.currentTime = 0;
-        v.play().catch(function(){});
-      });
-
-      v.addEventListener('pause', function() {
-        if (!v._blobReady) return; // still loading — this is the frozen first frame, not a real pause
-        if (!shouldBePlaying.has(v)) return; // intentionally paused (out of view) — leave it
-        // Small delay avoids fighting a pause/play the browser is already
-        // mid-transition on (e.g. right after a seek).
-        setTimeout(function() {
-          if (shouldBePlaying.has(v) && v.paused) {
-            v.currentTime = 0;
-            v.play().catch(function(){});
-          }
-        }, 50);
-      });
-
-      // ---- Stall watchdog ----
-      // Re-encoded clips (especially via the MediaRecorder fallback path)
-      // can fail to loop in a way that never fires "pause" or "ended" at
-      // all: the browser just silently stalls, waiting on more data that
-      // isn't coming, because the container's duration/end-of-stream
-      // signalling is broken. currentTime simply stops advancing with no
-      // event to react to. Polling is the only reliable way to catch
-      // that: if playback hasn't actually moved forward in ~800ms while
-      // the video is supposed to be playing, force it back to frame 0.
+      var unlocked = !isTouch; // desktop: unlocked immediately; touch: unlocked after tap
+      var inView = false;
       var lastTime = -1;
       var stalledChecks = 0;
+
+      function shouldPlay() { return unlocked && inView; }
+
+      function restart() {
+        video.currentTime = 0;
+        video.play().catch(function() {});
+        lastTime = -1;
+        stalledChecks = 0;
+      }
+
+      function tryPlay() {
+        if (!shouldPlay()) return;
+        wrap.classList.add('is-playing');
+        video.play().catch(function() {});
+      }
+
+      if (hasIO) {
+        var io = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            inView = entry.isIntersecting;
+            if (inView) tryPlay(); else video.pause();
+          });
+        }, { threshold: 0.1 });
+        io.observe(wrap);
+      } else {
+        inView = true; // no IntersectionObserver support — just always eligible to play
+      }
+
+      if (!unlocked) {
+        wrap.addEventListener('click', function() {
+          unlocked = true;
+          tryPlay();
+        }, { once: true });
+      } else if (!hasIO) {
+        tryPlay();
+      }
+
       setInterval(function() {
-        if (!v._blobReady || !shouldBePlaying.has(v)) { lastTime = -1; stalledChecks = 0; return; }
-        if (v.paused) {
-          // In view, supposed to be playing, but paused: the browser
-          // refused (or silently dropped) an earlier play() attempt — e.g.
-          // autoplay policy, or play() called before the data was ready.
-          // Just keep retrying until it takes; this is what makes the
-          // first video at the top of the page start reliably without
-          // needing a rescroll.
-          lastTime = -1; stalledChecks = 0;
-          v.muted = true;
-          v.play().catch(function(){});
+        if (!shouldPlay()) { lastTime = -1; stalledChecks = 0; return; }
+
+        if (video.paused || video.ended || (isFinite(video.duration) && video.duration > 0 && video.currentTime >= video.duration - 0.1)) {
+          restart();
           return;
         }
-        if (v.currentTime === lastTime) {
+
+        if (video.currentTime === lastTime) {
           stalledChecks++;
-          if (stalledChecks >= 2) {
-            stalledChecks = 0;
-            v.currentTime = 0;
-            v.play().catch(function(){});
-          }
+          if (stalledChecks >= 2) restart();
         } else {
           stalledChecks = 0;
         }
-        lastTime = v.currentTime;
+        lastTime = video.currentTime;
       }, 400);
     });
-
-    var io = ('IntersectionObserver' in window) ? new IntersectionObserver(function(entries) {
-      entries.forEach(function(entry) {
-        var v = entry.target;
-        if (entry.isIntersecting) {
-          if (v.classList.contains('av-loop')) {
-            shouldBePlaying.add(v);
-            v.play().catch(function(){});
-          }
-        } else {
-          shouldBePlaying.delete(v);
-          v.pause();
-        }
-      });
-    }, { threshold: 0.01 }) : null;
-
-    // Only becomes eligible for playback (observed, or — with no
-    // IntersectionObserver support — played immediately) once its data
-    // is actually ready.
-    function makePlayable(v) {
-      v._blobReady = true;
-      if (io) {
-        io.observe(v);
-      } else if (v.classList.contains('av-loop')) {
-        shouldBePlaying.add(v);
-        v.play().catch(function(){});
-      } else {
-        v.classList.remove('av-loading'); // controlled video, not auto-playing — no point pulsing
-      }
-    }
-
-    allVideos.forEach(function(v) {
-      var realSrc = v.currentSrc || v.getAttribute('src');
-      if (!realSrc || realSrc.indexOf('data:') === 0) {
-        makePlayable(v); // already fully inline — nothing to fetch first
-        return;
-      }
-      // If the blob copy ever fails to decode, drop back to the real URL.
-      v.addEventListener('error', function() {
-        if (v._fellBack) return;
-        v._fellBack = true;
-        v._blobReady = true;
-        v.classList.remove('av-loading');
-        v.src = realSrc;
-        v.load();
-      });
-      fetch(realSrc)
-        .then(function(r) {
-          if (!r.ok) throw new Error('bad response'); // never blob-swap a 404/HTML error page
-          return r.blob();
-        })
-        .then(function(blob) {
-          if (!blob || !blob.size) throw new Error('empty');
-          v.src = URL.createObjectURL(blob);
-          v.load();
-          makePlayable(v);
-        })
-        .catch(function() {
-          // Fetch failed for any reason — fall back to the original
-          // network src rather than leaving the video inert forever.
-          v._blobReady = true;
-          makePlayable(v);
-        });
-    });
   })();
 
-  // ---- Repaint nudge for phone/loop videos ----
-  // A video can be genuinely playing yet paint as a black rectangle — the
-  // browser decodes frames but never composites them. It hits the video
-  // that is already on screen while the page loader overlay is still
-  // fading, because its layer was created underneath the overlay. Any
-  // fresh layer/frame forces it to paint, so nudge every loop video a few
-  // times around load and whenever one (re)starts playing.
-  (function initVideoRepaint() {
-    var vids = document.querySelectorAll('video.av-loop');
-    if (!vids.length) return;
-
-    function nudge(v) {
-      if (v.paused) return;
-      v.style.transform = 'translateZ(0) scale(1.0005)';
-      requestAnimationFrame(function() {
-        requestAnimationFrame(function() { v.style.transform = 'translateZ(0)'; });
-      });
-      // Seeking to (almost) the same spot makes the browser present a
-      // newly decoded frame.
-      try {
-        if (v.readyState >= 2 && v.duration && isFinite(v.duration)) {
-          v.currentTime = Math.min(v.currentTime + 0.001, v.duration);
-        }
-      } catch (e) {}
-    }
-    function nudgeAll() { for (var i = 0; i < vids.length; i++) nudge(vids[i]); }
-
-    Array.prototype.forEach.call(vids, function(v) {
-      v.addEventListener('playing', function() {
-        setTimeout(function() { nudge(v); }, 250);
-        setTimeout(function() { nudge(v); }, 1000);
-      });
-    });
-
-    function afterLoad() {
-      [600, 1200, 2500, 4000].forEach(function(ms) { setTimeout(nudgeAll, ms); });
-    }
-    if (document.readyState === 'complete') afterLoad();
-    else window.addEventListener('load', afterLoad);
-  })();
 
   // ---- Fade away the page loader once the page is genuinely fully
   // loaded ----
