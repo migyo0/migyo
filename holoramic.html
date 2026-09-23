@@ -75,11 +75,6 @@
   .phone-media img, .phone-media video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
   .phone-media video { transform:translateZ(0); backface-visibility:hidden; }
   .av-loop { z-index:1; }
-  .video-tap-wrap { position:relative; display:block; }
-  .phone-media .video-tap-wrap { position:absolute; inset:0; width:100%; height:100%; }
-  .video-tap-btn { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:52px; height:52px; border-radius:50%; background:rgba(0,0,0,0.55); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; z-index:2; transition:background 0.2s ease; }
-  .video-tap-btn:hover { background:rgba(0,0,0,0.7); }
-  .video-tap-wrap.is-playing .video-tap-btn { display:none; }
   .phone-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 
   /* Page loader: a plain white overlay that fades away once the page is
@@ -175,7 +170,7 @@
     </div>
 
     <div class="section" id="section-4">
-      <div class="img-single"><span class="video-tap-wrap"><video src="assets/holoramic-section-4-media-1.webm" class="av-loop" muted playsinline preload="auto"></video><button type="button" class="video-tap-btn" aria-label="Play video"><svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M8 5v14l11-7z"/></svg></button></span></div>
+      <div class="img-single"><video src="assets/holoramic-section-4-media-1.webm" class="av-loop" autoplay muted playsinline webkit-playsinline preload="auto"></video></div>
       
       
       
@@ -323,40 +318,34 @@
   })();
 
 
-  // ---- Uploaded video clips: tap-to-play on phones, play only while in
+  // ---- Uploaded video clips: play like normal video, only while in
   // view, loop reliably ----
-  // Two things this handles:
-  // 1. Tap-to-play on touch devices (a real tap is the one thing every
-  //    browser reliably allows playback on) — desktop just plays itself.
-  // 2. Only plays while actually scrolled into view; pauses otherwise.
+  // No tap-to-play gate anymore — plays automatically on every device,
+  // same as desktop always did.
   //
-  // Looping is driven entirely by a watchdog poll, not by trusting any
-  // single event. Native "loop" and the 'ended' event both proved
-  // unreliable for video recorded via MediaRecorder (how the WebM
-  // conversion works) — in practice each restarted the clip exactly once
-  // and then silently stopped firing again. Rather than chase which event
-  // almost works, this just checks actual playback position directly a
-  // few times a second: if the clip should be playing but is paused,
-  // ended, at/past its duration, or simply hasn't advanced since the last
-  // check (frozen with no event fired at all), it's forced back to frame
-  // 0 and restarted. No event has to fire correctly for this to work.
-  (function initVideoTaps() {
-    var wraps = document.querySelectorAll('.video-tap-wrap');
-    if (!wraps.length) return;
+  // Looping and "only while visible" are both driven by a watchdog poll,
+  // not by trusting any single event or by comparing against the video's
+  // reported duration. Neither proved reliable for video recorded via
+  // MediaRecorder (how the WebM conversion works): native "loop" and the
+  // 'ended' event each restarted the clip exactly once and then silently
+  // stopped firing again, and MediaRecorder output is also known for
+  // reporting a wrong/unstable duration — comparing playback position
+  // against that duration was actually causing a false "reached the end"
+  // trigger after about a second, which looked like the clip pausing on
+  // its own. So this checks only: is it supposed to be playing right now
+  // (in view), and is it actually paused, ended, or frozen (hasn't
+  // advanced since the last check, with no event fired at all)? If so,
+  // force it back to frame 0 and play — no duration involved anywhere.
+  (function initVideoLoops() {
+    var videos = document.querySelectorAll('video.av-loop');
+    if (!videos.length) return;
 
-    var isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
     var hasIO = 'IntersectionObserver' in window;
 
-    wraps.forEach(function(wrap) {
-      var video = wrap.querySelector('video');
-      if (!video) return;
-
-      var unlocked = !isTouch; // desktop: unlocked immediately; touch: unlocked after tap
+    videos.forEach(function(video) {
       var inView = false;
       var lastTime = -1;
       var stalledChecks = 0;
-
-      function shouldPlay() { return unlocked && inView; }
 
       function restart() {
         video.currentTime = 0;
@@ -366,8 +355,7 @@
       }
 
       function tryPlay() {
-        if (!shouldPlay()) return;
-        wrap.classList.add('is-playing');
+        if (!inView) return;
         video.play().catch(function() {});
       }
 
@@ -378,24 +366,16 @@
             if (inView) tryPlay(); else video.pause();
           });
         }, { threshold: 0.1 });
-        io.observe(wrap);
+        io.observe(video);
       } else {
         inView = true; // no IntersectionObserver support — just always eligible to play
-      }
-
-      if (!unlocked) {
-        wrap.addEventListener('click', function() {
-          unlocked = true;
-          tryPlay();
-        }, { once: true });
-      } else if (!hasIO) {
         tryPlay();
       }
 
       setInterval(function() {
-        if (!shouldPlay()) { lastTime = -1; stalledChecks = 0; return; }
+        if (!inView) { lastTime = -1; stalledChecks = 0; return; }
 
-        if (video.paused || video.ended || (isFinite(video.duration) && video.duration > 0 && video.currentTime >= video.duration - 0.1)) {
+        if (video.paused || video.ended) {
           restart();
           return;
         }
