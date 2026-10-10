@@ -1,0 +1,1414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="color-scheme" content="light">
+<title>Migyo</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Front page. Sizes and colours from the Figma frame "Slide 5". */
+:root {
+  --ink: rgba(0, 0, 0, 0.8);
+  --ink-soft: rgba(0, 0, 0, 0.6);
+  --ink-faint: rgba(0, 0, 0, 0.32);
+  --chip: rgba(0, 0, 0, 0.04);
+  --chip-hover: rgba(0, 0, 0, 0.07);
+  --bg: #fff;
+  --fs: 0.85;            /* folder + picture scale (1 = original Figma size); the intro text is not affected */
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--bg); color-scheme: light; scroll-behavior: smooth; scrollbar-width: none; -ms-overflow-style: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; height: 0; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+/* A white band above the top of the page (out of scroll reach), so anything Safari shows
+   behind its see-through top bar, or when the page is pulled down, is white. */
+html::before { content: ""; position: absolute; left: 0; right: 0; top: -200vh; height: 200vh; background: var(--bg); pointer-events: none; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/normal var(--font); -webkit-font-smoothing: antialiased; }
+p { margin: 0; }
+
+/* Layout: intro | folders + scroll dots. The intro and dots stay put while the folders scroll past. */
+.page { display: flex; justify-content: center; gap: 100px; min-height: 100vh; }
+/* Safari 26 tints its top bar from any fixed or sticky element touching the top of the window,
+   so the intro carries the page colour, and the dots sit mid-screen rather than at the top edge. */
+/* The text column and the dots are pinned to the screen (position: fixed, handled by the graphics layer) rather than
+   "sticky" (repositioned on the main thread while scrolling, which shimmers when the page is busy). The .intro and
+   .dots boxes stay in the layout as empty spacers, so nothing else moves. */
+.intro { flex: none; width: 220px; height: 100vh; height: 100svh; }
+.intro-inner { position: fixed; top: 0; width: 220px; height: 100vh; height: 100svh; display: flex; flex-direction: column; justify-content: center;
+  gap: 40px; background: var(--bg); }
+.dots { flex: none; width: 4px; align-self: flex-start; }
+.intro-text { display: flex; flex-direction: column; gap: 20px; padding: 0 4px; }
+.intro h1 { margin: 0; font-size: 20px; font-weight: 600; line-height: normal; color: var(--ink); }
+.intro-bio { display: flex; flex-direction: column; gap: 17px; font-size: 14px; }
+.actions { display: flex; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 79px; background: var(--chip);
+  color: var(--ink-soft); font: 500 14px/normal var(--font); text-decoration: none; transition: background-color .15s; }
+.chip:hover { background: var(--chip-hover); }
+.chip img { width: 16px; height: 16px; display: block; }
+
+.work { display: flex; gap: 20px; }
+.projects { list-style: none; margin: 0; width: calc(302px * var(--fs)); display: flex; flex-direction: column; gap: calc(80px * var(--fs));
+  padding: calc(50vh - (233px * var(--fs) + 48px) / 2) 0; padding: calc(50svh - (233px * var(--fs) + 48px) / 2) 0;
+  /* Measured by script (see "Scroll range"): top of the first folder = top of the name; bottom of the last folder = bottom of the buttons. */
+  padding-top: var(--pad-top, calc(50svh - (233px * var(--fs) + 48px) / 2)); padding-bottom: var(--pad-bottom, calc(50svh - (233px * var(--fs) + 48px) / 2)); }
+
+/* Scroll position dots */
+.dots-inner { position: fixed; top: calc(50vh - 5.5px * var(--n, 3)); top: calc(50svh - 5.5px * var(--n, 3)); display: flex; flex-direction: column; gap: 7px; }
+.dot { width: 4px; height: 4px; padding: 0; border: 0; border-radius: 99px; background: rgba(0, 0, 0, 0.1); cursor: pointer;
+  transition: height .25s ease, background-color .25s ease; }
+.dot[aria-current="true"] { height: 11px; background: var(--ink); }
+
+/* Project: folder + label */
+.project { display: flex; flex-direction: column; align-items: center; gap: 24px; color: inherit; text-decoration: none;
+  outline: none; -webkit-tap-highlight-color: transparent; }
+.project:focus-visible .label { box-shadow: 0 0 0 2px var(--ink); }
+.label { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 500; line-height: 24px; border-radius: 6px; padding: 0 4px; }
+.label::before { content: ""; width: 12px; height: 12px; border-radius: 24px; background: var(--accent); }
+.label .year { color: var(--ink-faint); }
+
+/* Folder. The stage is the back panel's box (240 × 233); the drawing area spills out around it
+   for the folder's shadow and the cards. */
+.zf-stage { position: relative; width: calc(240px * var(--fs)); height: calc(233px * var(--fs)); }
+.zf { position: absolute; left: calc(-75.996px * var(--fs)); top: calc(-43.059px * var(--fs)); width: calc(392px * var(--fs)); height: calc(370px * var(--fs)); pointer-events: none; }
+.zf > .zf-layer, .zf > .zf-frost { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.zf-frost > div { position: absolute; inset: 0; clip-path: inset(100%); }
+
+/* Cards, positioned by their centre on the back panel (Figma units). */
+.zf-cards { position: absolute; left: calc(75.996px * var(--fs)); top: calc(43.059px * var(--fs)); width: 240px; height: 233px;
+  transform: scale(var(--fs)); transform-origin: 0 0; }
+.zf-card { position: absolute; margin: 0; left: calc(var(--x) * 1px); top: calc(var(--y) * 1px);
+  width: calc(var(--w, 108) * 1px); height: calc(var(--h, 108) * 1px);
+  /* On hover (--hs 0 → 1) the cards spread 8% from the folder's centre line, rise 10px with the
+     folder's lift, and tilt a quarter further. */
+  transform:
+    translate(calc(-50% + (var(--x) - 120.004) * 0.08 * var(--hs, 0) * 1px),
+              calc(-50% + var(--lift, 0px) - 10px * var(--hs, 0)))
+    rotate(calc(var(--r, 0) * (1 + 0.25 * var(--hs, 0)) * 1deg));
+  padding: 14px; border-radius: 20px; background: #fff;
+  /* Card shadow (0 / 4 / 4, 14%), lifting a little further as the folder opens on hover. */
+  box-shadow: inset 0.5px 1px 0.6px #fff,
+    0 calc(4px + 4px * var(--hs, 0)) calc(4px + 6px * var(--hs, 0)) rgba(0, 0, 0, 0.14); }
+.shot { position: relative; height: 100%; border-radius: 10px; overflow: hidden; }
+.shot::after { content: ""; position: absolute; inset: 0; border: 1px solid rgba(0, 0, 0, 0.16); border-radius: 10px; }
+.shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.shot img.fit { object-fit: contain; }
+.shot img.crop { inset: auto; max-width: none; }
+
+/* Narrow screens: stack the intro above the folders, plain page scroll. */
+@media (max-width: 760px) {
+  .page { flex-direction: column; align-items: center; gap: 72px; padding: 72px 20px 96px; }
+  .intro { width: auto; height: auto; }
+  .intro-inner { position: static; width: min(302px, 100%); height: auto; justify-content: flex-start; }
+  .dots { display: none; }
+  .projects { padding: 0; }
+}
+
+/* Project view (Figma "Slide 4"), opened from a folder. The folder unfolds and travels to the top
+   right while its matching cards grow into the project's images. */
+html.pv-lock { overflow: hidden; }
+.pv { position: fixed; inset: 0; z-index: 10; overflow: hidden; background: rgba(255, 255, 255, 0); overscroll-behavior: contain;
+  scrollbar-width: none; -webkit-tap-highlight-color: transparent; }
+.pv::-webkit-scrollbar { display: none; }
+.pv[hidden] { display: none; }
+.pv.is-open { overflow-y: auto; }
+/* Once open, the project page scrolls with the browser window (like the front page), so it runs under the browser bars. */
+.pv.is-doc { position: absolute; inset: 0 0 auto 0; height: auto; min-height: 100vh; min-height: 100lvh; overflow: visible; }
+/* The folder is drawn inside the scrolling page (not pinned to the screen and nudged by script), so it can never lag. */
+.pv-under, .pv-over { position: absolute; left: 0; top: 0; width: 100%; display: block; pointer-events: none; }
+.pv-under { z-index: 1; }
+.pv-over { z-index: 5; }
+.pv-over.is-flipped { z-index: 2; }
+.pv-frost { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
+.pv-frost > div { position: absolute; inset: 0; }
+.pv-fly { position: fixed; inset: 0; z-index: 3; pointer-events: none; transition: opacity .22s ease; }
+.pv-fly.is-landed { opacity: 0; }
+.pv-close { position: absolute; left: 0; top: 0; z-index: 6; margin: 0; padding: 0; border: 0; background: none; cursor: pointer;
+  border-radius: 24px; outline: none; -webkit-tap-highlight-color: transparent; }
+
+.pv { --fs: 0.6625; }
+.pv-content { position: relative; z-index: 3; box-sizing: border-box; width: min(816px, 100% - 80px); margin: 0 auto;
+  padding: calc(80px + env(safe-area-inset-top, 0px)) 0 calc(44px + env(safe-area-inset-bottom, 0px)); }
+.pv-head { width: calc(100% - 357px); display: flex; flex-direction: column; gap: 20px; }
+.pv-text { display: flex; flex-direction: column; gap: 12px; padding: 0 4px; }
+.pv-title { margin: 0; font-size: 20px; font-weight: 600; line-height: normal; }
+.pv-title > span { display: inline-flex; gap: 8px; white-space: nowrap; color: var(--ink); }
+.pv-title .year { color: rgba(0, 0, 0, 0.24); }
+.pv-desc { margin: 0; font-size: 14px; color: var(--ink); }
+.pv-back { display: none; border: 0; cursor: pointer; color: var(--c); -webkit-appearance: none; appearance: none; }
+.pv-back svg { display: block; width: 16px; height: 16px; }
+.pv-reveal { opacity: 0; transform: translate3d(0, 14px, 0); pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease; }
+.pv-head.pv-reveal { will-change: opacity, transform; }
+.pv-reveal.is-in { opacity: 1; transform: translate3d(0, 0, 0); pointer-events: auto;
+  transition: opacity .7s ease, transform .9s cubic-bezier(.22, 1, .36, 1); }
+@media (prefers-reduced-motion: reduce) { .pv-reveal, .pv-reveal.is-in { transition-duration: .01s; } }
+/* Closing: no unfolding in reverse, the whole view just fades away over the front page. */
+.pv.is-closing { opacity: 0; pointer-events: none; transition: opacity .25s ease; }
+/* The back panel's box; the folder is drawn around it. */
+.pv-slot { position: absolute; top: calc(80px + env(safe-area-inset-top, 0px)); right: 40px; width: calc(240px * var(--fs)); height: calc(233px * var(--fs)); pointer-events: none; }
+.pv-shots { display: flex; flex-direction: column; gap: 0; margin-top: 28px; }
+.pv-shot { --frame-border: color-mix(in srgb, #e0e0e0 60%, transparent);
+  box-sizing: border-box; position: relative; margin: 0; aspect-ratio: 1920 / 1540; border-radius: 8px; border: 1px solid var(--frame-border); background: var(--bg); }
+
+/* Phone frames and the text under each frame (from the old Daywise page). */
+.pv-pres { position: relative; aspect-ratio: 4 / 3; margin: 0; }
+.pv-pres.r169 { aspect-ratio: 16 / 9; }
+.pv-pres > .pv-shot { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; }
+.pv-pres > .pv-shot:not(.is-on) { visibility: hidden; }
+.pv-sec { margin-bottom: 60px; }
+.pv-sec.tight { margin-bottom: 20px; }
+.pv-sec:last-child { margin-bottom: 0; }
+.pv-shot.r169 { aspect-ratio: 16 / 9; }
+.pv-cap > p:first-child { margin-top: 0; }
+.pv-imgs { display: flex; flex-direction: column; gap: 20px; }
+.pv-cap { margin-top: 16px; }
+.pv-label { margin: 0; font: inherit; font-size: 14px; line-height: 1.4; color: #999; }
+.pv-cap p { margin-top: 12px; font-size: 14px; line-height: 1.4; color: var(--ink); }
+.pv-shot.is-phone { aspect-ratio: auto; height: 550px; padding: 40px 0; display: flex; align-items: center; justify-content: center; }
+.pv-shot.is-phone.scaled-top, .pv-shot.is-phone.scaled-bottom { height: 450px; overflow: hidden; }
+.pv-shot.is-phone.scaled-top { padding: 40px 0 0; align-items: flex-start; }
+.pv-shot.is-phone.scaled-bottom { padding: 0 0 40px; align-items: flex-end; }
+.pv-phone { position: relative; height: 100%; aspect-ratio: 396 / 810; flex-shrink: 0; }
+.scaled-top .pv-phone, .scaled-bottom .pv-phone { height: 150%; }
+.pv-screen { position: absolute; top: 1.728%; bottom: 1.728%; left: 4.545%; right: 4.545%; overflow: hidden; border-radius: 15% / 6.9%; background: #000; outline: 2px solid #000; }
+.pv-shot:not(.is-phone) { overflow: hidden; }
+.pv-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.fc-shot.is-morph { position: absolute; width: auto; height: auto; }
+.fc-bezel { position: absolute; left: 0; top: 0; display: block; pointer-events: none; opacity: 0; }
+/* the phone's camera pill, so it fades in with the phone rather than popping in when the card lands */
+.fc-shot.is-morph::before { content: ""; position: absolute; z-index: 1; left: 34.72%; top: 1.66%; width: 30.56%; height: 3.96%;
+  border-radius: 13.6% / 48%; background: #000; opacity: var(--pill, 0); }
+.pv-bezel { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* Flying cards: the white card frame thins away as each grows into its image. */
+.fc { position: absolute; left: 0; top: 0; box-sizing: border-box; background: #fff; will-change: transform; transition: opacity .12s linear; }
+.fc-shot { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.fc-shot::after { content: ""; position: absolute; inset: 0; border: 1px solid rgba(0, 0, 0, 0.16); border-radius: inherit; opacity: var(--bo, 1); }
+.fc-shot img { position: absolute; display: block; max-width: none; }
+
+/* While the project is open, the front page's folder and label are drawn by the project view. */
+.project.is-launched .zf-stage { visibility: hidden; }
+
+/* ---- Mobile layout (follows the Figma frame: 769px wide, everything scales with --s = screen width / 769) ---- */
+@media (max-width: 760px) {
+  :root { --s: 0.507; --p: 0.6667; }
+  .page { align-items: flex-start; gap: calc(88px * var(--s)); padding: calc(44px * var(--s)) calc(44px * var(--s)) calc(88px * var(--s)); }
+  .work { width: 100%; flex-direction: column; gap: 0; }
+  .intro { width: 100%; }
+  .intro-inner { width: min(100%, 368px); gap: 28px; }
+  .projects { --fs: calc(0.88 * var(--s)); width: 100%; display: grid; grid-template-columns: 1fr 1fr; column-gap: 0; row-gap: calc(88px * var(--s)); align-items: start; padding: 0 calc(44px * var(--s)); box-sizing: border-box; }
+  .projects > li { display: flex; width: 100%; }
+  .projects > li:nth-child(odd) { justify-content: flex-start; }
+  .projects > li:nth-child(even) { justify-content: flex-end; }
+  .project { gap: calc(20px * var(--s)); }
+  .label { font-size: clamp(11px, calc(14px * var(--s) + 5px), 17px); line-height: 1.2; gap: 6px; padding: 0 2px; white-space: nowrap; }
+  .label::before { width: 8px; height: 8px; }
+  /* Project page, from the Figma frame Slide 8 (585px wide): geometry scales with --p = screen width / 585, text stays at its set size. */
+  .pv { --fs: calc(0.625 * var(--p)); }
+  .pv-content { width: calc(100% - (80px * var(--p))); padding-top: calc(40px * var(--p) + env(safe-area-inset-top, 0px)); }
+  .pv-head { width: auto; min-height: 0; gap: 20px; }
+  .pv-text { gap: 12px; }
+  .pv-title { font-size: 16px; }
+  .pv-slot { position: absolute; top: calc(50vh - (233px * var(--fs)) / 2); top: calc(50svh - (233px * var(--fs)) / 2); left: calc(50% - (240px * var(--fs)) / 2); right: auto; margin: 0; width: calc(240px * var(--fs)); height: calc(233px * var(--fs)); }
+  .pv-shots { margin-top: 28px; }
+  /* No folder on phones: it opens and settles in the middle of the screen, where the growing images cover it; the Back button (in the folder's colour) closes the project. */
+  .pv.is-open .pv-under, .pv.is-open .pv-over { opacity: 0; }
+  .pv-close { display: none !important; }
+  .pv-back { display: inline-flex; }
+  .pv .chip { padding: 8px 10px; gap: 8px; font-size: 14px; line-height: normal; }
+  .pv .chip img { width: 16px; height: 16px; }
+  /* Smaller Contact / Info buttons, text the same size as the body text; no hover states on mobile */
+  .chip { padding: 7px 12px; gap: 6px; font-size: 14px; line-height: 20px; }
+  .chip img { width: 14px; height: 14px; }
+  .chip:hover { background: var(--chip); }
+  .chip, .project { -webkit-tap-highlight-color: transparent; }
+}
+@keyframes page-fade-in { from { opacity: 0; } to { opacity: 1; } }
+body { animation: page-fade-in .9s ease-out backwards; }
+@media (prefers-reduced-motion: reduce) { body { animation: none; } }
+.info-pop { position: fixed; z-index: 99999; padding: 8px 12px; text-align: center; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: #111; color: #fff; font: 500 14px/1.3 var(--font); box-shadow: 0 8px 24px rgba(0,0,0,.18); opacity: 0; transform: translateY(-4px); pointer-events: none; transition: opacity .15s ease, transform .15s ease; white-space: nowrap; }
+.info-pop.is-open { opacity: 1; transform: none; pointer-events: auto; }
+.info-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.info-dot { width: 8px; height: 8px; border-radius: 50%; background: #f5a623; flex: none; }
+.info-dot.on { background: #34c759; }
+.info-pop small { display: block; font-size: 12px; font-weight: 400; opacity: .6; margin-bottom: 2px; }
+.info-pop::before { content: ""; position: absolute; top: -12px; left: var(--ax, 50%); width: 40px; height: 14px; margin-left: -20px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0.5 40 14'%3E%3Cpath d='M0 12C8 12 12 10.7 15.3 6.4Q20 0.3 24.7 6.4C28 10.7 32 12 40 12L40 14L0 14Z' fill='%23111'/%3E%3Cpath d='M0 12C8 12 12 10.7 15.3 6.4Q20 0.3 24.7 6.4C28 10.7 32 12 40 12' fill='none' stroke='%23292929' stroke-width='1'/%3E%3C/svg%3E") no-repeat center / 100% 100%; }
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="intro">
+    <div class="intro-inner">
+      <div class="intro-text">
+        <h1>Miguel Young</h1>
+        <div class="intro-bio">
+          <p>Graphic designer and visual artist based in England. With over three years of experience across brand identity, art direction, product design, and digital illustration.</p>
+          <p>I built and maintained an independent art platform of over 200,000 on all platforms, working with hundreds of clients across a broad range of projects.</p>
+        </div>
+      </div>
+      <nav class="actions" aria-label="About">
+        <a class="chip" href="mailto:contact@migyo.uk"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJGcmFtZSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik04Ljg4IDguODI3QzguOTU0IDguODY5IDkuMDQ2IDguODY5IDkuMTIgOC44MjdMMTYuODk3IDQuNTQ0QzE2LjU4MyAzLjM3MSAxNS41MjEgMi41IDE0LjI1IDIuNUgzLjc1QzIuNDgzIDIuNSAxLjQyNCAzLjM2NSAxLjEwNyA0LjUzM0w4Ljg4IDguODI3WiIgZmlsbD0iYmxhY2siIGZpbGwtb3BhY2l0eT0iMC42Ii8+CjxwYXRoIGlkPSJWZWN0b3JfMiIgZD0iTTkuODQ1IDEwLjE0QzkuNTgxIDEwLjI4NiA5LjI5MSAxMC4zNTkgOS4wMDEgMTAuMzU5QzguNzExIDEwLjM1OSA4LjQxOSAxMC4yODYgOC4xNTUgMTAuMTM5TDEgNi4xODhWMTIuNzVDMSAxNC4yNjcgMi4yMzMgMTUuNSAzLjc1IDE1LjVIMTQuMjVDMTUuNzY3IDE1LjUgMTcgMTQuMjY3IDE3IDEyLjc1VjYuMkw5Ljg0NSAxMC4xNFoiIGZpbGw9ImJsYWNrIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8L2c+Cjwvc3ZnPgo=" alt="">Contact</a>
+        <a class="chip" href="#info"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJGcmFtZSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik05IDFDNC41ODg5IDEgMSA0LjU4ODkgMSA5QzEgMTMuNDExMSA0LjU4ODkgMTcgOSAxN0MxMy40MTExIDE3IDE3IDEzLjQxMTEgMTcgOUMxNyA0LjU4ODkgMTMuNDExMSAxIDkgMVpNOS43NSAxMi43NUM5Ljc1IDEzLjE2NDEgOS40MTQxIDEzLjUgOSAxMy41QzguNTg1OSAxMy41IDguMjUgMTMuMTY0MSA4LjI1IDEyLjc1VjkuNUg3Ljc1QzcuMzM1OSA5LjUgNyA5LjE2NDEgNyA4Ljc1QzcgOC4zMzU5IDcuMzM1OSA4IDcuNzUgOEg4LjVDOS4xODk1IDggOS43NSA4LjU2MDUgOS43NSA5LjI1VjEyLjc1Wk05IDYuNzVDOC40NDggNi43NSA4IDYuMzAxIDggNS43NUM4IDUuMTk5IDguNDQ4IDQuNzUgOSA0Ljc1QzkuNTUyIDQuNzUgMTAgNS4xOTkgMTAgNS43NUMxMCA2LjMwMSA5LjU1MiA2Ljc1IDkgNi43NVoiIGZpbGw9ImJsYWNrIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8L2c+Cjwvc3ZnPgo=" alt="">Info</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="work" aria-label="Projects">
+    <ul class="projects">
+      <li id="daywise">
+        <a class="project" href="#daywise" style="--accent:#ff4359" aria-label="Daywise, 2026">
+          <div class="zf-stage">
+            <div class="zf" data-color="red">
+              <div class="zf-cards"><figure class="zf-card" style="--x:45.711; --y:116.445; --r:-10.02; --h:200.176;"><div class="shot"><img src="assets/daywise-01.png" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:187.459; --y:121.884; --r:15; --h:200.176;"><div class="shot"><img src="assets/daywise-02.png" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:117.454; --y:104.888; --r:0; --h:200.176;"><div class="shot"><img src="assets/daywise-03.png" decoding="async" alt=""></div></figure></div>
+            </div>
+          </div>
+          <p class="label">Daywise <span class="year">2026</span></p>
+        </a>
+      </li>
+<li id="symmetra">
+        <a class="project" href="#symmetra" style="--accent:#478eec" aria-label="Symmetra, 2026">
+          <div class="zf-stage">
+            <div class="zf" data-color="blue">
+              <div class="zf-cards"><figure class="zf-card" style="--x:38.287; --y:93.787; --r:-23;"><div class="shot"><img src="assets/symmetra-01.jpg" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:119.414; --y:61.914; --r:-1;"><div class="shot"><img src="assets/symmetra-02.jpg" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:199.695; --y:97.195; --r:21;"><div class="shot"><img src="assets/symmetra-03.png" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:68.976; --y:152.476; --r:15;"><div class="shot"><img src="assets/symmetra-04.png" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:158.7025; --y:151.2025; --r:-20;"><div class="shot"><img src="assets/symmetra-05.jpg" decoding="async" alt=""></div></figure></div>
+            </div>
+          </div>
+          <p class="label">Symmetra <span class="year">2026</span></p>
+        </a>
+      </li>
+<li id="flutter">
+        <a class="project" href="#flutter" style="--accent:#a0f72f" aria-label="Flutter, 2026">
+          <div class="zf-stage">
+            <div class="zf" data-color="lime">
+              <div class="zf-cards"><figure class="zf-card" style="--x:45.711; --y:116.445; --r:-10.02; --h:200.176;"><div class="shot"><img src="assets/flutter-01.jpg" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:187.459; --y:121.884; --r:15; --h:200.176;"><div class="shot"><img src="assets/flutter-02.png" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:117.454; --y:104.888; --r:0; --h:200.176;"><div class="shot"><img src="assets/flutter-03.png" decoding="async" alt=""></div></figure></div>
+            </div>
+          </div>
+          <p class="label">Flutter <span class="year">2026</span></p>
+        </a>
+      </li>
+<li id="mosaic">
+        <a class="project" href="#mosaic" style="--accent:#ff6f35" aria-label="Mosaic, 2025">
+          <div class="zf-stage">
+            <div class="zf" data-color="orange">
+              <div class="zf-cards"><figure class="zf-card" style="--x:38.287; --y:93.787; --r:-23;"><div class="shot"><img src="assets/mosaic-01.png" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:119.414; --y:61.914; --r:-1;"><div class="shot"><img src="assets/mosaic-02.jpg" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:199.695; --y:97.195; --r:21;"><div class="shot"><img src="assets/mosaic-03.png" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:68.976; --y:152.476; --r:15;"><div class="shot"><img src="assets/mosaic-04.png" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:158.7025; --y:151.2025; --r:-20;"><div class="shot"><img src="assets/mosaic-05.jpg" decoding="async" alt=""></div></figure></div>
+            </div>
+          </div>
+          <p class="label">Mosaic <span class="year">2025</span></p>
+        </a>
+      </li>
+<li id="holoramic">
+        <a class="project" href="#holoramic" style="--accent:#656565" aria-label="Holoramic, 2025">
+          <div class="zf-stage">
+            <div class="zf" data-color="grey">
+              <div class="zf-cards"><figure class="zf-card" style="--x:38.287; --y:93.787; --r:-23;"><div class="shot"><img src="assets/holoramic-01.png" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:119.414; --y:61.914; --r:-1;"><div class="shot"><img src="assets/holoramic-02.jpg" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:199.695; --y:97.195; --r:21;"><div class="shot"><img src="assets/holoramic-03.png" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:68.976; --y:152.476; --r:15;"><div class="shot"><img src="assets/holoramic-04.png" decoding="async" alt=""></div></figure><figure class="zf-card" style="--x:158.7025; --y:151.2025; --r:-20;"><div class="shot"><img src="assets/holoramic-05.jpg" decoding="async" alt=""></div></figure></div>
+            </div>
+          </div>
+          <p class="label">Holoramic <span class="year">2025</span></p>
+        </a>
+      </li>
+    </ul>
+    <div class="dots" aria-hidden="false">
+      <div class="dots-inner" role="group" aria-label="Jump to project"></div>
+    </div>
+  </section>
+</main>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><symbol id="pv-bezel" viewBox="0 0 396 810" fill="none"><rect width="93.5317" height="8" rx="3" transform="matrix(1.68243e-08 -1 -1 -1.13567e-07 396 346)" fill="#6C6B6D"/><rect width="93" height="7" rx="3" transform="matrix(1.68243e-08 -1 -1 -1.13567e-07 395 346)" fill="#353439"/><rect width="93" height="5" rx="1" transform="matrix(1.68243e-08 -1 -1 -1.13567e-07 393 346)" fill="#262529"/><rect y="202.002" width="35.8231" height="8" rx="3" transform="rotate(-90 0 202.002)" fill="#6C6B6D"/><rect x="1" y="202" width="36" height="7" rx="3" transform="rotate(-90 1 202)" fill="#353439"/><rect x="3" y="202" width="36" height="5" rx="1" transform="rotate(-90 3 202)" fill="#262529"/><rect y="290" width="57.7111" height="8" rx="3" transform="rotate(-90 0 290)" fill="#6C6B6D"/><rect x="1" y="289.996" width="57.9961" height="7" rx="3" transform="rotate(-90 1 289.996)" fill="#353439"/><rect x="3" y="289.996" width="57.9961" height="5" rx="1" transform="rotate(-90 3 289.996)" fill="#262529"/><rect y="366" width="57.7111" height="8" rx="3" transform="rotate(-90 0 366)" fill="#6C6B6D"/><rect x="1" y="365.996" width="57.9961" height="7" rx="3" transform="rotate(-90 1 365.996)" fill="#353439"/><rect x="3" y="365.996" width="57.9961" height="5" rx="1" transform="rotate(-90 3 365.996)" fill="#262529"/><rect x="8" y="4" width="380" height="802" rx="63" stroke="#353439" stroke-width="8"/><rect x="9" y="5" width="378" height="800" rx="63" stroke="#7C7C7C" stroke-opacity="0.22" stroke-width="8"/><rect x="143" y="27" width="110" height="31" rx="15" fill="black"/><rect x="10" y="5" width="376" height="798" rx="63" stroke="#7C7C7C" stroke-opacity="0.6" stroke-width="8"/><rect x="11" y="7" width="374" height="796" rx="61" stroke="#28272B" stroke-width="8"/><rect x="13" y="9" width="370" height="792" rx="59" stroke="black" stroke-width="10"/></symbol></svg>
+<div class="pv" id="pv-daywise" data-title="Daywise" data-link="#daywise .project" role="dialog" aria-modal="true" aria-label="Daywise, 2026" hidden>
+  <canvas class="pv-under" aria-hidden="true"></canvas>
+  <div class="pv-content">
+    <header class="pv-head pv-reveal">
+      <div class="pv-text">
+        <h2 class="pv-title"><span>Daywise <span class="year">2026</span></span></h2>
+        <p class="pv-desc">Daywise brings your schedule, tasks, and calendar together in one place, so every part of your day stays visible without piling up. Laid out clean and simple, with nothing competing for your attention. Everything you need, all in one app.</p>
+      </div>
+      <nav class="actions" aria-label="About">
+        <button class="chip pv-back" type="button" style="--c:#EB3B4F" onclick="this.closest('.pv').querySelector('.pv-close').click()"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 0.888889C4.07911 0.888889 0.888889 4.07911 0.888889 8C0.888889 11.9209 4.07911 15.1111 8 15.1111C11.9209 15.1111 15.1111 11.9209 15.1111 8C15.1111 4.07911 11.9209 0.888889 8 0.888889ZM9.36 10.1956C9.62044 10.456 9.62044 10.8782 9.36 11.1387C9.23022 11.2684 9.05956 11.3342 8.88889 11.3342C8.71822 11.3342 8.54756 11.2693 8.41778 11.1387L5.75111 8.472C5.49067 8.21156 5.49067 7.78933 5.75111 7.52889L8.41778 4.86222C8.67822 4.60178 9.10044 4.60178 9.36089 4.86222C9.62133 5.12267 9.62133 5.54489 9.36089 5.80533L7.16533 8.00089L9.36089 10.1964L9.36 10.1956Z" fill="currentColor"/></svg>Back</button>
+        <a class="chip" href="mailto:contact@migyo.uk"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJGcmFtZSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik04Ljg4IDguODI3QzguOTU0IDguODY5IDkuMDQ2IDguODY5IDkuMTIgOC44MjdMMTYuODk3IDQuNTQ0QzE2LjU4MyAzLjM3MSAxNS41MjEgMi41IDE0LjI1IDIuNUgzLjc1QzIuNDgzIDIuNSAxLjQyNCAzLjM2NSAxLjEwNyA0LjUzM0w4Ljg4IDguODI3WiIgZmlsbD0iYmxhY2siIGZpbGwtb3BhY2l0eT0iMC42Ii8+CjxwYXRoIGlkPSJWZWN0b3JfMiIgZD0iTTkuODQ1IDEwLjE0QzkuNTgxIDEwLjI4NiA5LjI5MSAxMC4zNTkgOS4wMDEgMTAuMzU5QzguNzExIDEwLjM1OSA4LjQxOSAxMC4yODYgOC4xNTUgMTAuMTM5TDEgNi4xODhWMTIuNzVDMSAxNC4yNjcgMi4yMzMgMTUuNSAzLjc1IDE1LjVIMTQuMjVDMTUuNzY3IDE1LjUgMTcgMTQuMjY3IDE3IDEyLjc1VjYuMkw5Ljg0NSAxMC4xNFoiIGZpbGw9ImJsYWNrIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8L2c+Cjwvc3ZnPgo=" alt="">Contact</a>
+        <a class="chip" href="#info"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJGcmFtZSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik05IDFDNC41ODg5IDEgMSA0LjU4ODkgMSA5QzEgMTMuNDExMSA0LjU4ODkgMTcgOSAxN0MxMy40MTExIDE3IDE3IDEzLjQxMTEgMTcgOUMxNyA0LjU4ODkgMTMuNDExMSAxIDkgMVpNOS43NSAxMi43NUM5Ljc1IDEzLjE2NDEgOS40MTQxIDEzLjUgOSAxMy41QzguNTg1OSAxMy41IDguMjUgMTMuMTY0MSA4LjI1IDEyLjc1VjkuNUg3Ljc1QzcuMzM1OSA5LjUgNyA5LjE2NDEgNyA4Ljc1QzcgOC4zMzU5IDcuMzM1OSA4IDcuNzUgOEg4LjVDOS4xODk1IDggOS43NSA4LjU2MDUgOS43NSA5LjI1VjEyLjc1Wk05IDYuNzVDOC40NDggNi43NSA4IDYuMzAxIDggNS43NUM4IDUuMTk5IDguNDQ4IDQuNzUgOSA0Ljc1QzkuNTUyIDQuNzUgMTAgNS4xOTkgMTAgNS43NUMxMCA2LjMwMSA5LjU1MiA2Ljc1IDkgNi43NVoiIGZpbGw9ImJsYWNrIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8L2c+Cjwvc3ZnPgo=" alt="">Info</a>
+      </nav>
+    </header>
+    <div class="pv-slot" aria-hidden="true"></div>
+    <div class="pv-shots">
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="0" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Schedule Page</h3><p>This is the default start page: a schedule with a clean, gradient-draining design that shows your current block and how much time remains. Colors and icons are fully customizable, and with a collapse and uncollapse slider allowing you to have a focused or broad look at your day.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone scaled-bottom" data-card="1" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Detailed Block</h3><p>Tapping a block opens a sheet showing its description (if one has been added), along with options to edit or delete it. Holding the block brings up the same options. The sheet takes on the color of the block, keeping the look clean and consistent.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone scaled-top" data-card="2" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Tasks Page</h3><p>This is the core function of the tasks page, split into three tiers: low, medium, and urgent. Urgent tasks send a daily notification (if notifications are enabled), and each tier is paired with a fitting color and custom icon. If a task has a description, tapping it expands the card to reveal the full text.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="3" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Adding Tasks</h3><p>When creating a task, there's a smooth color fade between each priority level, along with a fluid transition when selecting the &quot;Live&quot; task type. Every level lets you set a title, description, and custom icon, except for Live, which is designed to function as a persistent reminder.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="4" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Live Tasks</h3><p>Adding a Live task turns it into a Live Activity: a constant, visible reminder to complete the task that appears on your home screen, Dynamic Island, and other connected devices, including MacBook, iPad, and CarPlay.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="5" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Calendar Page</h3><p>This is the calendar page, where you can compare events against your schedule seamlessly, and plan ahead easily by creating shared calendars with friends and family.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="6" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Event Reminders</h3><p>The calendar connects smoothly with the schedule page too: events subtly appear on the day picker as small icons. Tapping one opens a sheet detailing the event(s) for that day. This sheet also appears automatically the first time you open the app on a day with a scheduled event.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="7" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Profile Page</h3><p>The profile page offers a snapshot of your overall stats and your friends', showing remaining blocks for the day, upcoming events for the month, and total outstanding tasks.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="8" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Friend activity</h3><p>Daywise's social features go beyond shared calendars. You can also get a glimpse into your friends' day at a glance.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="9" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Profile Settings</h3><p>You can choose, crop, take, or remove your profile picture as you like. Your unique username helps friends find and add you, and your chosen color appears consistently throughout the app.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone scaled-top" data-card="10" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Colour Palette</h3><p>The color palette was carefully curated to stay minimal while covering every major and minor color the app needs. Holding a color reveals two complementary variations, with smooth transitions across the entire palette.</p></div></section>
+<section class="pv-sec"><div class="pv-imgs"><figure class="pv-shot" data-card="11" aria-hidden="true"></figure><figure class="pv-shot" data-card="12" aria-hidden="true"></figure></div><div class="pv-cap pv-reveal"><h3 class="pv-label">Brand Identity</h3><p>Daywise App by Miguel Young</p></div></section>
+    </div>
+  </div>
+  <div class="pv-fly" aria-hidden="true"></div>
+  <div class="pv-frost" aria-hidden="true"></div>
+  <canvas class="pv-over" aria-hidden="true"></canvas>
+  <button class="pv-close" type="button" aria-label="Close Daywise"></button>
+</div>
+<div class="pv" id="pv-symmetra" data-title="Symmetra" data-link="#symmetra .project" role="dialog" aria-modal="true" aria-label="Symmetra, 2026" hidden>
+  <canvas class="pv-under" aria-hidden="true"></canvas>
+  <div class="pv-content">
+    <header class="pv-head pv-reveal">
+      <div class="pv-text">
+        <h2 class="pv-title"><span>Symmetra <span class="year">2026</span></span></h2>
+        <p class="pv-desc">Symmetra is an architectural design studio built on the belief that balance is never accidental. Rooted in structure, proportion, and negative space. This Brand Identity is a reflection of that clean and modern direction.</p>
+      </div>
+      <nav class="actions" aria-label="About">
+        <button class="chip pv-back" type="button" style="--c:#3447CA" onclick="this.closest('.pv').querySelector('.pv-close').click()"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 0.888889C4.07911 0.888889 0.888889 4.07911 0.888889 8C0.888889 11.9209 4.07911 15.1111 8 15.1111C11.9209 15.1111 15.1111 11.9209 15.1111 8C15.1111 4.07911 11.9209 0.888889 8 0.888889ZM9.36 10.1956C9.62044 10.456 9.62044 10.8782 9.36 11.1387C9.23022 11.2684 9.05956 11.3342 8.88889 11.3342C8.71822 11.3342 8.54756 11.2693 8.41778 11.1387L5.75111 8.472C5.49067 8.21156 5.49067 7.78933 5.75111 7.52889L8.41778 4.86222C8.67822 4.60178 9.10044 4.60178 9.36089 4.86222C9.62133 5.12267 9.62133 5.54489 9.36089 5.80533L7.16533 8.00089L9.36089 10.1964L9.36 10.1956Z" fill="currentColor"/></svg>Back</button>
+        <a class="chip" href="mailto:contact@migyo.uk"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJGcmFtZSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik04Ljg4IDguODI3QzguOTU0IDguODY5IDkuMDQ2IDguODY5IDkuMTIgOC44MjdMMTYuODk3IDQuNTQ0QzE2LjU4MyAzLjM3MSAxNS41MjEgMi41IDE0LjI1IDIuNUgzLjc1QzIuNDgzIDIuNSAxLjQyNCAzLjM2NSAxLjEwNyA0LjUzM0w4Ljg4IDguODI3WiIgZmlsbD0iYmxhY2siIGZpbGwtb3BhY2l0eT0iMC42Ii8+CjxwYXRoIGlkPSJWZWN0b3JfMiIgZD0iTTkuODQ1IDEwLjE0QzkuNTgxIDEwLjI4NiA5LjI5MSAxMC4zNTkgOS4wMDEgMTAuMzU5QzguNzExIDEwLjM1OSA4LjQxOSAxMC4yODYgOC4xNTUgMTAuMTM5TDEgNi4xODhWMTIuNzVDMSAxNC4yNjcgMi4yMzMgMTUuNSAzLjc1IDE1LjVIMTQuMjVDMTUuNzY3IDE1LjUgMTcgMTQuMjY3IDE3IDEyLjc1VjYuMkw5Ljg0NSAxMC4xNFoiIGZpbGw9ImJsYWNrIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8L2c+Cjwvc3ZnPgo=" alt="">Contact</a>
+        <a class="chip" href="#info"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJGcmFtZSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik05IDFDNC41ODg5IDEgMSA0LjU4ODkgMSA5QzEgMTMuNDExMSA0LjU4ODkgMTcgOSAxN0MxMy40MTExIDE3IDE3IDEzLjQxMTEgMTcgOUMxNyA0LjU4ODkgMTMuNDExMSAxIDkgMVpNOS43NSAxMi43NUM5Ljc1IDEzLjE2NDEgOS40MTQxIDEzLjUgOSAxMy41QzguNTg1OSAxMy41IDguMjUgMTMuMTY0MSA4LjI1IDEyLjc1VjkuNUg3Ljc1QzcuMzM1OSA5LjUgNyA5LjE2NDEgNyA4Ljc1QzcgOC4zMzU5IDcuMzM1OSA4IDcuNzUgOEg4LjVDOS4xODk1IDggOS43NSA4LjU2MDUgOS43NSA5LjI1VjEyLjc1Wk05IDYuNzVDOC40NDggNi43NSA4IDYuMzAxIDggNS43NUM4IDUuMTk5IDguNDQ4IDQuNzUgOSA0Ljc1QzkuNTUyIDQuNzUgMTAgNS4xOTkgMTAgNS43NUMxMCA2LjMwMSA5LjU1MiA2Ljc1IDkgNi43NVoiIGZpbGw9ImJsYWNrIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8L2c+Cjwvc3ZnPgo=" alt="">Info</a>
+      </nav>
+    </header>
+    <div class="pv-slot" aria-hidden="true"></div>
+    <div class="pv-shots">
+<section class="pv-sec tight"><div class="pv-imgs"><figure class="pv-shot" data-card="0" aria-hidden="true"></figure><figure class="pv-shot" data-card="1" aria-hidden="true"></figure></div></section>
+<section class="pv-sec tight"><div class="pv-imgs"><figure class="pv-shot" data-card="2" aria-hidden="true"></figure></div></section>
+<section class="pv-sec tight"><div class="pv-imgs"><figure class="pv-shot" data-card="3" aria-hidden="true"></figure></div></section>
+<section class="pv-sec tight"><div class="pv-pres"><figure class="pv-shot is-on" data-card="4" aria-hidden="true"></figure><figure class="pv-shot" data-card="5" aria-hidden="true"></figure><figure class="pv-shot" data-card="6" aria-hidden="true"></figure><figure class="pv-shot" data-card="7" aria-hidden="true"></figure></div></section>
+    </div>
+  </div>
+  <div class="pv-fly" aria-hidden="true"></div>
+  <div class="pv-frost" aria-hidden="true"></div>
+  <canvas class="pv-over" aria-hidden="true"></canvas>
+  <button class="pv-close" type="button" aria-label="Close Symmetra"></button>
+</div>
+<div class="pv" id="pv-flutter" data-title="Flutter" data-link="#flutter .project" role="dialog" aria-modal="true" aria-label="Flutter, 2026" hidden>
+  <canvas class="pv-under" aria-hidden="true"></canvas>
+  <div class="pv-content">
+    <header class="pv-head pv-reveal">
+      <div class="pv-text">
+        <h2 class="pv-title"><span>Flutter <span class="year">2026</span></span></h2>
+        <p class="pv-desc">Flutter is a clean, modern take on the music listening experience. Designed around comfort, clarity, and the needs of the listener. A unique adaptive navigation bar that expands and contracts in response to user interaction.</p>
+      </div>
+      <nav class="actions" aria-label="About">
+        <button class="chip pv-back" type="button" style="--c:#6FE31C" onclick="this.closest('.pv').querySelector('.pv-close').click()"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 0.888889C4.07911 0.888889 0.888889 4.07911 0.888889 8C0.888889 11.9209 4.07911 15.1111 8 15.1111C11.9209 15.1111 15.1111 11.9209 15.1111 8C15.1111 4.07911 11.9209 0.888889 8 0.888889ZM9.36 10.1956C9.62044 10.456 9.62044 10.8782 9.36 11.1387C9.23022 11.2684 9.05956 11.3342 8.88889 11.3342C8.71822 11.3342 8.54756 11.2693 8.41778 11.1387L5.75111 8.472C5.49067 8.21156 5.49067 7.78933 5.75111 7.52889L8.41778 4.86222C8.67822 4.60178 9.10044 4.60178 9.36089 4.86222C9.62133 5.12267 9.62133 5.54489 9.36089 5.80533L7.16533 8.00089L9.36089 10.1964L9.36 10.1956Z" fill="currentColor"/></svg>Back</button>
+        <a class="chip" href="mailto:contact@migyo.uk"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJGcmFtZSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik04Ljg4IDguODI3QzguOTU0IDguODY5IDkuMDQ2IDguODY5IDkuMTIgOC44MjdMMTYuODk3IDQuNTQ0QzE2LjU4MyAzLjM3MSAxNS41MjEgMi41IDE0LjI1IDIuNUgzLjc1QzIuNDgzIDIuNSAxLjQyNCAzLjM2NSAxLjEwNyA0LjUzM0w4Ljg4IDguODI3WiIgZmlsbD0iYmxhY2siIGZpbGwtb3BhY2l0eT0iMC42Ii8+CjxwYXRoIGlkPSJWZWN0b3JfMiIgZD0iTTkuODQ1IDEwLjE0QzkuNTgxIDEwLjI4NiA5LjI5MSAxMC4zNTkgOS4wMDEgMTAuMzU5QzguNzExIDEwLjM1OSA4LjQxOSAxMC4yODYgOC4xNTUgMTAuMTM5TDEgNi4xODhWMTIuNzVDMSAxNC4yNjcgMi4yMzMgMTUuNSAzLjc1IDE1LjVIMTQuMjVDMTUuNzY3IDE1LjUgMTcgMTQuMjY3IDE3IDEyLjc1VjYuMkw5Ljg0NSAxMC4xNFoiIGZpbGw9ImJsYWNrIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8L2c+Cjwvc3ZnPgo=" alt="">Contact</a>
+        <a class="chip" href="#info"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJGcmFtZSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik05IDFDNC41ODg5IDEgMSA0LjU4ODkgMSA5QzEgMTMuNDExMSA0LjU4ODkgMTcgOSAxN0MxMy40MTExIDE3IDE3IDEzLjQxMTEgMTcgOUMxNyA0LjU4ODkgMTMuNDExMSAxIDkgMVpNOS43NSAxMi43NUM5Ljc1IDEzLjE2NDEgOS40MTQxIDEzLjUgOSAxMy41QzguNTg1OSAxMy41IDguMjUgMTMuMTY0MSA4LjI1IDEyLjc1VjkuNUg3Ljc1QzcuMzM1OSA5LjUgNyA5LjE2NDEgNyA4Ljc1QzcgOC4zMzU5IDcuMzM1OSA4IDcuNzUgOEg4LjVDOS4xODk1IDggOS43NSA4LjU2MDUgOS43NSA5LjI1VjEyLjc1Wk05IDYuNzVDOC40NDggNi43NSA4IDYuMzAxIDggNS43NUM4IDUuMTk5IDguNDQ4IDQuNzUgOSA0Ljc1QzkuNTUyIDQuNzUgMTAgNS4xOTkgMTAgNS43NUMxMCA2LjMwMSA5LjU1MiA2Ljc1IDkgNi43NVoiIGZpbGw9ImJsYWNrIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8L2c+Cjwvc3ZnPgo=" alt="">Info</a>
+      </nav>
+    </header>
+    <div class="pv-slot" aria-hidden="true"></div>
+    <div class="pv-shots">
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="0" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Home Page</h3><p>Flutter is an experimental take on the music app. It draws on Spotify and Apple Music, but pushes past their basic presentation with more expressive, dynamic interactions. The home page is built on a stark black and white palette, with a neon lime accent that cuts through it. The contrast keeps the layout clean while giving the app a bold, recognisable identity.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone scaled-bottom" data-card="1" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Mini Player</h3><p>Inspired by Apple's Dynamic Island, the navigation bar carries most of the app's interaction. It pops up into a miniplayer, then expands into a full player, so playback always feels connected to the bar.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="2" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Player Expanded</h3><p>The loop, shuffle and lyrics buttons each have their own small animation. These touches respond to every tap, making the player feel more alive than a set of static icons.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="3" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Library Page</h3><p>In the library, the filter and sort button expands cleanly into its options with a subtle bounce. It stays true to the app's aesthetic while keeping the page uncluttered.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="4" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Search Page</h3><p>Search is where the app's aesthetic is on show. A hero image with a distinct colour contrast sits behind the page, with album covers layered over it to create depth.</p></div></section>
+<section class="pv-sec"><figure class="pv-shot is-phone" data-card="5" aria-hidden="true"><div class="pv-phone"><div class="pv-screen"></div><svg class="pv-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"/></svg></div></figure><div class="pv-cap pv-reveal"><h3 class="pv-label">Create Playlist</h3><p>The plus button swings out and turns into a cross as the navigation bar expands into a drawer of playlist options. From there, creating a new playlist is one more step.</p></div></section>
+<section class="pv-sec"><div class="pv-imgs"><figure class="pv-shot" data-card="6" aria-hidden="true"></figure><figure class="pv-shot" data-card="7" aria-hidden="true"></figure></div><div class="pv-cap pv-reveal"><h3 class="pv-label">Brand Identity</h3><p>Flutter App by Miguel Young</p></div></section>
+    </div>
+  </div>
+  <div class="pv-fly" aria-hidden="true"></div>
+  <div class="pv-frost" aria-hidden="true"></div>
+  <canvas class="pv-over" aria-hidden="true"></canvas>
+  <button class="pv-close" type="button" aria-label="Close Flutter"></button>
+</div>
+<div class="pv" id="pv-mosaic" data-title="Mosaic" data-link="#mosaic .project" role="dialog" aria-modal="true" aria-label="Mosaic, 2025" hidden>
+  <canvas class="pv-under" aria-hidden="true"></canvas>
+  <div class="pv-content">
+    <header class="pv-head pv-reveal">
+      <div class="pv-text">
+        <h2 class="pv-title"><span>Mosaic <span class="year">2025</span></span></h2>
+        <p class="pv-desc">Mosaic is a creative studio built on the idea that good design is never accidental. They work at the intersection of brand identity, art direction, and systems thinking. This Brand Identity is a reflection of that clean and modern direction.</p>
+      </div>
+      <nav class="actions" aria-label="About">
+        <button class="chip pv-back" type="button" style="--c:#F56C35" onclick="this.closest('.pv').querySelector('.pv-close').click()"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 0.888889C4.07911 0.888889 0.888889 4.07911 0.888889 8C0.888889 11.9209 4.07911 15.1111 8 15.1111C11.9209 15.1111 15.1111 11.9209 15.1111 8C15.1111 4.07911 11.9209 0.888889 8 0.888889ZM9.36 10.1956C9.62044 10.456 9.62044 10.8782 9.36 11.1387C9.23022 11.2684 9.05956 11.3342 8.88889 11.3342C8.71822 11.3342 8.54756 11.2693 8.41778 11.1387L5.75111 8.472C5.49067 8.21156 5.49067 7.78933 5.75111 7.52889L8.41778 4.86222C8.67822 4.60178 9.10044 4.60178 9.36089 4.86222C9.62133 5.12267 9.62133 5.54489 9.36089 5.80533L7.16533 8.00089L9.36089 10.1964L9.36 10.1956Z" fill="currentColor"/></svg>Back</button>
+        <a class="chip" href="mailto:contact@migyo.uk"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJGcmFtZSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik04Ljg4IDguODI3QzguOTU0IDguODY5IDkuMDQ2IDguODY5IDkuMTIgOC44MjdMMTYuODk3IDQuNTQ0QzE2LjU4MyAzLjM3MSAxNS41MjEgMi41IDE0LjI1IDIuNUgzLjc1QzIuNDgzIDIuNSAxLjQyNCAzLjM2NSAxLjEwNyA0LjUzM0w4Ljg4IDguODI3WiIgZmlsbD0iYmxhY2siIGZpbGwtb3BhY2l0eT0iMC42Ii8+CjxwYXRoIGlkPSJWZWN0b3JfMiIgZD0iTTkuODQ1IDEwLjE0QzkuNTgxIDEwLjI4NiA5LjI5MSAxMC4zNTkgOS4wMDEgMTAuMzU5QzguNzExIDEwLjM1OSA4LjQxOSAxMC4yODYgOC4xNTUgMTAuMTM5TDEgNi4xODhWMTIuNzVDMSAxNC4yNjcgMi4yMzMgMTUuNSAzLjc1IDE1LjVIMTQuMjVDMTUuNzY3IDE1LjUgMTcgMTQuMjY3IDE3IDEyLjc1VjYuMkw5Ljg0NSAxMC4xNFoiIGZpbGw9ImJsYWNrIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8L2c+Cjwvc3ZnPgo=" alt="">Contact</a>
+        <a class="chip" href="#info"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJGcmFtZSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik05IDFDNC41ODg5IDEgMSA0LjU4ODkgMSA5QzEgMTMuNDExMSA0LjU4ODkgMTcgOSAxN0MxMy40MTExIDE3IDE3IDEzLjQxMTEgMTcgOUMxNyA0LjU4ODkgMTMuNDExMSAxIDkgMVpNOS43NSAxMi43NUM5Ljc1IDEzLjE2NDEgOS40MTQxIDEzLjUgOSAxMy41QzguNTg1OSAxMy41IDguMjUgMTMuMTY0MSA4LjI1IDEyLjc1VjkuNUg3Ljc1QzcuMzM1OSA5LjUgNyA5LjE2NDEgNyA4Ljc1QzcgOC4zMzU5IDcuMzM1OSA4IDcuNzUgOEg4LjVDOS4xODk1IDggOS43NSA4LjU2MDUgOS43NSA5LjI1VjEyLjc1Wk05IDYuNzVDOC40NDggNi43NSA4IDYuMzAxIDggNS43NUM4IDUuMTk5IDguNDQ4IDQuNzUgOSA0Ljc1QzkuNTUyIDQuNzUgMTAgNS4xOTkgMTAgNS43NUMxMCA2LjMwMSA5LjU1MiA2Ljc1IDkgNi43NVoiIGZpbGw9ImJsYWNrIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8L2c+Cjwvc3ZnPgo=" alt="">Info</a>
+      </nav>
+    </header>
+    <div class="pv-slot" aria-hidden="true"></div>
+    <div class="pv-shots">
+<section class="pv-sec tight"><div class="pv-imgs"><figure class="pv-shot" data-card="0" aria-hidden="true"></figure><figure class="pv-shot" data-card="1" aria-hidden="true"></figure></div></section>
+<section class="pv-sec tight"><div class="pv-imgs"><figure class="pv-shot" data-card="2" aria-hidden="true"></figure></div></section>
+<section class="pv-sec tight"><div class="pv-imgs"><figure class="pv-shot" data-card="3" aria-hidden="true"></figure></div></section>
+<section class="pv-sec tight"><div class="pv-pres"><figure class="pv-shot is-on" data-card="4" aria-hidden="true"></figure><figure class="pv-shot" data-card="5" aria-hidden="true"></figure><figure class="pv-shot" data-card="6" aria-hidden="true"></figure><figure class="pv-shot" data-card="7" aria-hidden="true"></figure></div></section>
+    </div>
+  </div>
+  <div class="pv-fly" aria-hidden="true"></div>
+  <div class="pv-frost" aria-hidden="true"></div>
+  <canvas class="pv-over" aria-hidden="true"></canvas>
+  <button class="pv-close" type="button" aria-label="Close Mosaic"></button>
+</div>
+<div class="pv" id="pv-holoramic" data-title="Holoramic" data-link="#holoramic .project" role="dialog" aria-modal="true" aria-label="Holoramic, 2025" hidden>
+  <canvas class="pv-under" aria-hidden="true"></canvas>
+  <div class="pv-content">
+    <header class="pv-head pv-reveal">
+      <div class="pv-text">
+        <h2 class="pv-title"><span>Holoramic <span class="year">2025</span></span></h2>
+        <p class="pv-desc">Holoramic is a typographic testing tool built to match the best font for a company. Designed for designers and brand teams who are in need of that right fit. This branding is meant to reflect that modern precision.</p>
+      </div>
+      <nav class="actions" aria-label="About">
+        <button class="chip pv-back" type="button" style="--c:#454545" onclick="this.closest('.pv').querySelector('.pv-close').click()"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 0.888889C4.07911 0.888889 0.888889 4.07911 0.888889 8C0.888889 11.9209 4.07911 15.1111 8 15.1111C11.9209 15.1111 15.1111 11.9209 15.1111 8C15.1111 4.07911 11.9209 0.888889 8 0.888889ZM9.36 10.1956C9.62044 10.456 9.62044 10.8782 9.36 11.1387C9.23022 11.2684 9.05956 11.3342 8.88889 11.3342C8.71822 11.3342 8.54756 11.2693 8.41778 11.1387L5.75111 8.472C5.49067 8.21156 5.49067 7.78933 5.75111 7.52889L8.41778 4.86222C8.67822 4.60178 9.10044 4.60178 9.36089 4.86222C9.62133 5.12267 9.62133 5.54489 9.36089 5.80533L7.16533 8.00089L9.36089 10.1964L9.36 10.1956Z" fill="currentColor"/></svg>Back</button>
+        <a class="chip" href="mailto:contact@migyo.uk"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJGcmFtZSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik04Ljg4IDguODI3QzguOTU0IDguODY5IDkuMDQ2IDguODY5IDkuMTIgOC44MjdMMTYuODk3IDQuNTQ0QzE2LjU4MyAzLjM3MSAxNS41MjEgMi41IDE0LjI1IDIuNUgzLjc1QzIuNDgzIDIuNSAxLjQyNCAzLjM2NSAxLjEwNyA0LjUzM0w4Ljg4IDguODI3WiIgZmlsbD0iYmxhY2siIGZpbGwtb3BhY2l0eT0iMC42Ii8+CjxwYXRoIGlkPSJWZWN0b3JfMiIgZD0iTTkuODQ1IDEwLjE0QzkuNTgxIDEwLjI4NiA5LjI5MSAxMC4zNTkgOS4wMDEgMTAuMzU5QzguNzExIDEwLjM1OSA4LjQxOSAxMC4yODYgOC4xNTUgMTAuMTM5TDEgNi4xODhWMTIuNzVDMSAxNC4yNjcgMi4yMzMgMTUuNSAzLjc1IDE1LjVIMTQuMjVDMTUuNzY3IDE1LjUgMTcgMTQuMjY3IDE3IDEyLjc1VjYuMkw5Ljg0NSAxMC4xNFoiIGZpbGw9ImJsYWNrIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8L2c+Cjwvc3ZnPgo=" alt="">Contact</a>
+        <a class="chip" href="#info"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiB2aWV3Qm94PSIwIDAgMTggMTgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJGcmFtZSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik05IDFDNC41ODg5IDEgMSA0LjU4ODkgMSA5QzEgMTMuNDExMSA0LjU4ODkgMTcgOSAxN0MxMy40MTExIDE3IDE3IDEzLjQxMTEgMTcgOUMxNyA0LjU4ODkgMTMuNDExMSAxIDkgMVpNOS43NSAxMi43NUM5Ljc1IDEzLjE2NDEgOS40MTQxIDEzLjUgOSAxMy41QzguNTg1OSAxMy41IDguMjUgMTMuMTY0MSA4LjI1IDEyLjc1VjkuNUg3Ljc1QzcuMzM1OSA5LjUgNyA5LjE2NDEgNyA4Ljc1QzcgOC4zMzU5IDcuMzM1OSA4IDcuNzUgOEg4LjVDOS4xODk1IDggOS43NSA4LjU2MDUgOS43NSA5LjI1VjEyLjc1Wk05IDYuNzVDOC40NDggNi43NSA4IDYuMzAxIDggNS43NUM4IDUuMTk5IDguNDQ4IDQuNzUgOSA0Ljc1QzkuNTUyIDQuNzUgMTAgNS4xOTkgMTAgNS43NUMxMCA2LjMwMSA5LjU1MiA2Ljc1IDkgNi43NVoiIGZpbGw9ImJsYWNrIiBmaWxsLW9wYWNpdHk9IjAuNiIvPgo8L2c+Cjwvc3ZnPgo=" alt="">Info</a>
+      </nav>
+    </header>
+    <div class="pv-slot" aria-hidden="true"></div>
+    <div class="pv-shots">
+<section class="pv-sec tight"><div class="pv-imgs"><figure class="pv-shot" data-card="0" aria-hidden="true"></figure><figure class="pv-shot" data-card="1" aria-hidden="true"></figure></div></section>
+<section class="pv-sec tight"><div class="pv-imgs"><figure class="pv-shot" data-card="2" aria-hidden="true"></figure></div></section>
+<section class="pv-sec tight"><div class="pv-imgs"><figure class="pv-shot" data-card="3" aria-hidden="true"></figure></div></section>
+<section class="pv-sec tight"><div class="pv-pres"><figure class="pv-shot is-on" data-card="4" aria-hidden="true"></figure><figure class="pv-shot" data-card="5" aria-hidden="true"></figure><figure class="pv-shot" data-card="6" aria-hidden="true"></figure><figure class="pv-shot" data-card="7" aria-hidden="true"></figure></div></section>
+    </div>
+  </div>
+  <div class="pv-fly" aria-hidden="true"></div>
+  <div class="pv-frost" aria-hidden="true"></div>
+  <canvas class="pv-over" aria-hidden="true"></canvas>
+  <button class="pv-close" type="button" aria-label="Close Holoramic"></button>
+</div>
+<script>
+/* Folder hover — portfolio front page.
+   Each .zf element becomes a folder: back panel (canvas), the project's cards (DOM),
+   frosted glass and the front panel (canvas). Hovering a project makes the folder peek open:
+   it lifts, the front panel tips forward, the back grows, the cards fan out and the glass frosts up.
+   Shapes and hover motion come from photofolio-folder.html; colours per project from Figma. */
+(() => {
+  // Folder outlines, closed (A) and hover (B), in one local frame: back panel at (35.996, 3.059), 240 × 233.
+  const S = {"backT": "M##C######C######C######H#C######C######C######C######C######C######H#C######C######C######V#C######C######C######H#C######C######C######V#Z", "backA": [35.996, 41.459, 35.996, 28.018, 35.996, 21.297, 38.612, 16.163, 40.913, 11.647, 44.584, 7.976, 49.1, 5.675, 54.234, 3.059, 60.955, 3.059, 74.396, 3.059, 104.344, 105.212, 3.059, 105.645, 3.059, 106.058, 3.073, 112.897, 3.309, 119.31, 6.452, 123.686, 11.714, 123.949, 12.031, 124.215, 12.374, 124.746, 13.059, 125.277, 13.744, 125.543, 14.087, 125.807, 14.404, 130.182, 19.666, 136.596, 22.809, 143.435, 23.045, 143.847, 23.059, 144.281, 23.059, 145.148, 23.059, 237.596, 251.037, 23.059, 257.758, 23.059, 262.892, 25.675, 267.408, 27.976, 271.079, 31.647, 273.38, 36.163, 275.996, 41.297, 275.996, 48.018, 275.996, 61.459, 197.659, 275.996, 211.1, 275.996, 217.821, 273.38, 222.955, 271.079, 227.471, 267.408, 231.142, 262.892, 233.443, 257.758, 236.059, 251.037, 236.059, 237.596, 236.059, 74.396, 60.955, 236.059, 54.234, 236.059, 49.1, 233.443, 44.584, 231.142, 40.913, 227.471, 38.612, 222.955, 35.996, 217.821, 35.996, 211.1, 35.996, 197.659, 41.459], "backB": [32.84, 38.4, 32.84, 24.959, 32.84, 18.238, 35.456, 13.104, 37.757, 8.588, 41.428, 4.917, 45.944, 2.616, 51.078, 0.0, 57.799, 0.0, 71.24, 0.0, 102.987, 104.179, 0.0, 104.775, 0.0, 105.342, 0.027, 111.963, 0.34, 118.159, 3.377, 122.462, 8.418, 122.83, 8.85, 123.195, 9.321, 123.925, 10.263, 124.656, 11.206, 125.021, 11.677, 125.389, 12.108, 129.692, 17.149, 135.888, 20.186, 142.509, 20.5, 143.076, 20.526, 143.672, 20.526, 144.864, 20.526, 240.756, 254.197, 20.526, 260.918, 20.526, 266.052, 23.142, 270.567, 25.443, 274.239, 29.115, 276.54, 33.63, 279.156, 38.764, 279.156, 45.485, 279.156, 58.926, 200.732, 279.156, 214.173, 279.156, 220.893, 276.54, 226.027, 274.239, 230.543, 270.567, 234.215, 266.052, 236.516, 260.918, 239.132, 254.197, 239.132, 240.756, 239.132, 71.24, 57.799, 239.132, 51.078, 239.132, 45.944, 236.516, 41.428, 234.215, 37.757, 230.543, 35.456, 226.027, 32.84, 220.893, 32.84, 214.173, 32.84, 200.732, 38.4], "frontT": "M##C######C######C######H#C######C######C######L##C######C######C######H#C######C######C######L##Z", "frontA": [31.216, 130.259, 30.268, 109.281, 29.794, 98.792, 33.583, 90.737, 36.913, 83.656, 42.459, 77.854, 49.383, 74.207, 57.258, 70.059, 67.758, 70.059, 88.757, 70.059, 223.235, 244.234, 70.059, 254.734, 70.059, 262.609, 74.207, 269.533, 77.854, 275.079, 83.656, 278.41, 90.737, 282.198, 98.792, 281.724, 109.281, 280.776, 130.259, 277.653, 199.392, 277.07, 212.282, 276.779, 218.727, 274.085, 223.625, 271.714, 227.936, 268.075, 231.415, 263.661, 233.589, 258.646, 236.059, 252.195, 236.059, 239.292, 236.059, 72.7, 59.797, 236.059, 53.346, 236.059, 48.331, 233.589, 43.917, 231.415, 40.278, 227.936, 37.907, 223.625, 35.213, 218.727, 34.922, 212.282, 34.34, 199.392, 31.216, 130.259], "frontB": [15.738, 149.231, 10.358, 125.232, 7.668, 113.233, 10.756, 103.813, 13.465, 95.554, 19.069, 88.554, 26.536, 84.105, 35.051, 79.03, 47.349, 79.03, 71.943, 79.03, 240.057, 264.651, 79.03, 276.948, 79.03, 285.464, 84.105, 292.93, 88.554, 298.535, 95.554, 301.243, 103.813, 304.332, 113.233, 301.642, 125.232, 296.261, 149.231, 282.831, 209.136, 280.431, 219.842, 279.231, 225.195, 276.345, 229.19, 273.799, 232.714, 270.344, 235.48, 266.348, 237.193, 261.819, 239.135, 256.333, 239.135, 245.361, 239.135, 66.639, 55.667, 239.135, 50.181, 239.135, 45.651, 237.193, 41.656, 235.48, 38.201, 232.714, 35.655, 229.19, 32.769, 225.195, 31.569, 219.842, 29.169, 209.136, 15.738, 149.231]};
+
+  // Per-project colours, from the Figma folders. rgb triplets as "r,g,b".
+  const THEMES = {
+    red:    { color: "236,71,90",  dark: "rgb(166,44,77)", backLight: "255,188,208", frontLight: "255,188,208" },
+    blue:   { color: "71,142,236", dark: "rgb(50,44,166)", backLight: "188,237,255", frontLight: "188,209,255" },
+    orange: { color: "245,108,53", dark: "rgb(172,35,8)",  backLight: "255,230,190", frontLight: "255,230,190" },
+    lime:   { color: "137,233,47", edge: "160,247,47", dark: "rgb(65,166,44)", backLight: "236,255,188", frontLight: "248,255,232" },
+    grey:   { color: "66,66,66",   dark: "rgb(30,30,30)", backLight: "196,196,196", frontLight: "196,196,196" },
+  };
+
+  window.__folderShapes = S;
+  window.__folderThemes = THEMES;
+
+  const VIEW_W = 392, PAD = 40;
+  const BACK_X = 35.996, BACK_Y = 3.059;    // back panel's top-left in the local frame
+  const CX = 156;                           // folder's vertical centre line (local)
+  const BLUR = { bottom: 2, topClosed: 6, topHover: 24 };
+  const BLUR_LAYERS = 8, REST_LAYERS = 4;
+  const STROKE_A = 0.2;
+  const HOVER_MS = 600;
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const clamp = (v) => Math.min(1, Math.max(0, v));
+  const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+  const mixArr = (A, B, t) => (t <= 0 ? A : A.map((v, i) => lerp(v, B[i], t)));
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)");
+
+  // Path string from a template ("M##C######…") and numbers, optionally mapped point by point.
+  function buildPath(tmpl, nums, map) {
+    let i = 0, x = 0, y = 0, out = "";
+    const pt = (px, py) => { const q = map ? map(px, py) : [px, py]; return q[0].toFixed(3) + " " + q[1].toFixed(3); };
+    for (const s of tmpl.match(/[A-Z]#*/g)) {
+      const c = s[0];
+      if (c === "Z") { out += "Z"; continue; }
+      if (c === "H") { x = nums[i++]; out += "L" + pt(x, y); continue; }
+      if (c === "V") { y = nums[i++]; out += "L" + pt(x, y); continue; }
+      out += c;
+      for (let j = 1; j < s.length; j += 2) { x = nums[i++]; y = nums[i++]; out += " " + pt(x, y); }
+    }
+    return out;
+  }
+  const HOLE = (() => { const p = new Path2D(); p.rect(-1500, -1500, 3300, 3000); return p; })();
+
+  function mountFolder(el) {
+    const theme = THEMES[el.dataset.color] || THEMES.blue;
+    const COLOR = theme.color;
+    const cards = el.querySelector(".zf-cards");
+
+    const under = document.createElement("canvas");
+    const frost = document.createElement("div");
+    const over = document.createElement("canvas");
+    frost.className = "zf-frost";
+    under.className = over.className = "zf-layer";
+    el.insertBefore(under, el.firstChild);
+    el.appendChild(frost);
+    el.appendChild(over);
+    [under, frost, over].forEach((n) => n.setAttribute("aria-hidden", "true"));
+    const ctx = under.getContext("2d"), octx = over.getContext("2d");
+    const work = document.createElement("canvas"), wctx = work.getContext("2d");
+    const frostLayers = Array.from({ length: BLUR_LAYERS }, () => frost.appendChild(document.createElement("div")));
+
+    let k = 1, css = 1;
+
+    function innerShadow(c, shape, dx, dy, sigma, color) {
+      const FAR = 4000, hole = new Path2D();
+      hole.addPath(HOLE);
+      hole.addPath(shape);
+      c.save();
+      c.clip(shape);
+      c.shadowColor = color;
+      c.shadowBlur = 2 * sigma * k;
+      c.shadowOffsetX = (dx + FAR) * k;
+      c.shadowOffsetY = dy * k;
+      c.translate(-FAR, 0);
+      c.fillStyle = "#000";
+      c.fill(hole, "evenodd");
+      c.restore();
+    }
+    function insideStroke(c, shape, a) {
+      c.save(); c.clip(shape); c.lineWidth = 2; c.strokeStyle = `rgba(0,0,0,${a})`; c.stroke(shape); c.restore();
+    }
+
+    // h: hover peek, 0 at rest → 1 fully peeked.
+    let h = 0, hFrom = 0, hTarget = 0, hStart = 0, hSpan = 0, raf = 0;
+
+    function render() {
+      const hs = h;
+      const lift = -6 * hs;                                   // the whole folder rises a little
+      const place = (c) => c.setTransform(k, 0, 0, k, PAD * k, (PAD + lift) * k);
+
+      const back = new Path2D(buildPath(S.backT, mixArr(S.backA, S.backB, hs)));
+      const front = new Path2D(buildPath(S.frontT, mixArr(S.frontA, S.frontB, hs)));
+      const outline = new Path2D(); outline.addPath(back); outline.addPath(front);
+      const hinge = lerp(236.059, 239.135, hs);                // front panel's bottom edge
+      const topLocal = lerp(70.059, 79.026, hs);               // and its top edge
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, under.width, under.height);
+
+      // 1. Drop shadow under the folder: it spreads and drops as the folder lifts.
+      wctx.setTransform(1, 0, 0, 1, 0, 0);
+      wctx.clearRect(0, 0, work.width, work.height);
+      place(wctx);
+      const FAR = 4000;
+      wctx.save();
+      wctx.translate(-FAR, 0);
+      wctx.shadowColor = `rgba(0,0,0,${lerp(0.2, 0.14, hs).toFixed(3)})`;
+      wctx.shadowBlur = 2 * lerp(10, 18, hs) * k;
+      wctx.shadowOffsetX = FAR * k;
+      wctx.shadowOffsetY = lerp(4, 20, hs) * k;
+      wctx.fillStyle = "#000";
+      wctx.fill(outline);
+      wctx.restore();
+      wctx.globalCompositeOperation = "destination-out";
+      wctx.fill(outline);
+      wctx.globalCompositeOperation = "source-over";
+      ctx.drawImage(work, 0, 0);
+
+      place(ctx);
+
+      // 2. Back panel.
+      const bg = ctx.createLinearGradient(0, lerp(3.059, 0, hs), 0, lerp(236.059, 239.132, hs));
+      bg.addColorStop(0, `rgb(${COLOR})`);
+      bg.addColorStop(1, theme.dark);
+      ctx.fillStyle = bg;
+      ctx.fill(back);
+      innerShadow(ctx, back, 2, 4, 1.4, `rgba(${theme.backLight},0.36)`);
+      insideStroke(ctx, back, STROKE_A);
+
+      // 3. Cards fan out: spread from the centre line, rise and tilt further.
+      el.style.setProperty("--hs", hs.toFixed(4));
+      el.style.setProperty("--lift", (lift * css).toFixed(3) + "px");
+
+      // 4. Progressive frosted glass behind the front panel (stronger at the top on hover).
+      const toCssX = (x) => (x + PAD) * css, toCssY = (y) => (y + PAD + lift) * css;
+      const clip = `path("${buildPath(S.frontT, mixArr(S.frontA, S.frontB, hs), (x, y) => [toCssX(x), toCssY(y)])}")`;
+      const topY = toCssY(topLocal), botY = toCssY(hinge);
+      const sigmaBottom = BLUR.bottom / 2;
+      const sigmaTop = lerp(BLUR.topClosed, BLUR.topHover, hs) / 2;
+      let prev = 0;
+      const n = hs > 0 ? BLUR_LAYERS : REST_LAYERS;            // fewer stacked blurs while the folder is still
+      const span = botY - topY, step = span / (n - 1);
+      frostLayers.forEach((layer, j) => {
+        layer.style.display = j < n ? "" : "none";
+        if (j >= n) return;
+        const f = j / (n - 1);
+        const sigma = lerp(sigmaBottom, sigmaTop, f);
+        const add = Math.sqrt(Math.max(0, sigma * sigma - prev * prev));
+        prev = sigma;
+        const blur = `blur(${(add * css).toFixed(2)}px)`;
+        layer.style.backdropFilter = blur;
+        layer.style.webkitBackdropFilter = blur;
+        layer.style.clipPath = clip;
+        if (j === 0) return;
+        const solidTo = botY - span * f;
+        const mask = `linear-gradient(to bottom, #000 ${solidTo.toFixed(2)}px, transparent ${(solidTo + step).toFixed(2)}px)`;
+        layer.style.webkitMaskImage = layer.style.maskImage = mask;
+      });
+
+      // 5. Front panel: radial wash, lighter at the centre of the hinge.
+      octx.setTransform(1, 0, 0, 1, 0, 0);
+      octx.clearRect(0, 0, over.width, over.height);
+      place(octx);
+      const rx = lerp(487.482, 487.911, hs), ry = lerp(166, 160.105, hs);
+      const rg = octx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      rg.addColorStop(0, `rgba(${COLOR},0.6)`);
+      rg.addColorStop(1, `rgb(${theme.edge || COLOR})`);
+      const local = new Path2D();
+      local.addPath(front, new DOMMatrix().scale(1 / rx, 1 / ry).translate(-CX, -hinge));
+      octx.save();
+      octx.translate(CX, hinge);
+      octx.scale(rx, ry);
+      octx.fillStyle = rg;
+      octx.fill(local);
+      octx.restore();
+      insideStroke(octx, front, STROKE_A);
+      innerShadow(octx, front, 0, 0, 9.15, `rgba(${COLOR},0.6)`);
+      innerShadow(octx, front, 2, 6, 2, `rgba(${theme.frontLight},0.52)`);
+      innerShadow(octx, front, 0, 1.4, 3, `rgba(${COLOR},0.8)`);
+    }
+
+    function resize() {
+      const r = el.getBoundingClientRect();
+      if (!r.width) return;
+      const dpr = 2;
+      const w = Math.round(r.width * dpr), hh = Math.round(r.height * dpr);
+      if (under.width !== w || under.height !== hh) {
+        under.width = work.width = over.width = w;
+        under.height = work.height = over.height = hh;
+      }
+      k = w / VIEW_W;
+      css = r.width / VIEW_W;
+      render();
+    }
+
+    function frame(now) {
+      if (!hStart) hStart = now;
+      const p = hSpan ? clamp((now - hStart) / hSpan) : 1;
+      h = p >= 1 ? hTarget : lerp(hFrom, hTarget, easeOut(p));
+      render();
+      if (h !== hTarget) raf = requestAnimationFrame(frame);
+      else raf = 0;
+    }
+    function setHover(on) {
+      const next = on ? 1 : 0;
+      if (next === hTarget) return;
+      hTarget = next; hFrom = h; hStart = 0;
+      hSpan = Math.abs(hTarget - hFrom) * (reduce.matches ? 150 : HOVER_MS);
+      el.classList.toggle("is-open", on);
+      if (!raf) raf = requestAnimationFrame(frame);
+    }
+
+    new ResizeObserver(resize).observe(el);
+    resize();
+    // Blurs are the costly part of scrolling, so folders off screen drop theirs.
+    new IntersectionObserver(([e]) => { frost.style.display = e.isIntersecting ? "" : "none"; },
+      { rootMargin: "200px 0px" }).observe(el);
+    return {
+      setHover,
+      get open() { return hTarget === 1; },
+      seek(v) { h = hTarget = hFrom = v; render(); },
+      get h() { return h; },
+    };
+  }
+
+  // Wiring: hover (mouse / pen) or keyboard focus opens a project's folder; leaving closes it.
+  // On touch, the first tap opens the folder and a second tap goes to the project.
+  const folders = [];
+  const MOBILE = matchMedia("(max-width: 760px)");
+  document.querySelectorAll(".project").forEach((link) => {
+    const el = link.querySelector(".zf");
+    if (!el) return;
+    const f = mountFolder(el);
+    el.__folder = f;
+    folders.push(f);
+    let pointer = "mouse";
+    link.addEventListener("pointerdown", (e) => { pointer = e.pointerType; });
+    link.addEventListener("pointerenter", (e) => { if (e.pointerType !== "touch" && !MOBILE.matches) f.setHover(true); });
+    link.addEventListener("pointerleave", (e) => { if (e.pointerType !== "touch") f.setHover(false); });
+    link.addEventListener("focus", () => { if (link.matches(":focus-visible") && !MOBILE.matches) f.setHover(true); });
+    link.addEventListener("blur", () => f.setHover(false));
+    link.addEventListener("click", (e) => {
+      if (pointer === "touch" && !f.open && !MOBILE.matches) {
+        e.preventDefault();
+        folders.forEach((o) => o !== f && o.setHover(false));
+        f.setHover(true);
+      }
+      pointer = "mouse";
+    });
+  });
+  window.__folders = folders;
+})();
+</script>
+<script>
+window.PHOTOS = {"daywise":{"folder":"assets","files":["daywise-01.png","daywise-02.png","daywise-03.png","daywise-04.png","daywise-05.png","daywise-06.png","daywise-07.png","daywise-08.png","daywise-09.png","daywise-10.png","daywise-11.png","daywise-12.png","daywise-13.png"]},"symmetra":{"folder":"assets","files":["symmetra-01.jpg","symmetra-02.jpg","symmetra-03.png","symmetra-04.png","symmetra-05.jpg","symmetra-06.jpg","symmetra-07.jpg","symmetra-08.jpg"]},"flutter":{"folder":"assets","files":["flutter-01.jpg","flutter-02.png","flutter-03.png","flutter-04.png","flutter-05.png","flutter-06.png","flutter-07.png","flutter-08.png"]},"mosaic":{"folder":"assets","files":["mosaic-01.png","mosaic-02.jpg","mosaic-03.png","mosaic-04.png","mosaic-05.jpg","mosaic-06.jpg","mosaic-07.jpg","mosaic-08.jpg"]},"holoramic":{"folder":"assets","files":["holoramic-01.png","holoramic-02.jpg","holoramic-03.png","holoramic-04.png","holoramic-05.jpg","holoramic-06.jpg","holoramic-07.jpg","holoramic-08.jpg"]}};
+</script>
+<script>
+/* Project views — the folder unfolds into the project page (Figma "Slide 4").
+   Motion follows photofolio-folder.html: the front panel swings down about its bottom edge, the back
+   clears to its open colouring and shows the close icon, the folder travels to the top right, and
+   cards fly out one after another and grow into the page's images (placeholder pieces for now). */
+function mountProject(pv) {
+  const link = document.querySelector(pv.dataset.link);
+  if (!link || !window.__folderShapes) return;
+  const S = window.__folderShapes;
+  const zf = link.querySelector(".zf");
+  const theme = window.__folderThemes[zf.dataset.color] || window.__folderThemes.blue;
+  const COLOR = theme.color, DARK = theme.dark.match(/\d+/g).map(Number);
+  const main = document.querySelector("main");
+  const BASE_TITLE = window.__baseTitle = window.__baseTitle || document.title;   // the page name, restored when a project closes
+
+  const under = pv.querySelector(".pv-under"), over = pv.querySelector(".pv-over");
+  const uctx = under.getContext("2d"), octx = over.getContext("2d");
+  const content = pv.querySelector(".pv-content"), slot = pv.querySelector(".pv-slot");
+  const fly = pv.querySelector(".pv-fly"), frostEl = pv.querySelector(".pv-frost");
+  const closeBtn = pv.querySelector(".pv-close");
+  const head = pv.querySelector(".pv-head");
+  const shots = [...pv.querySelectorAll(".pv-shot")];
+  // The folder's cards fly into the first frames; any further frames fade in with the text.
+  const cardCount = zf.querySelectorAll(".zf-card").length;
+  shots.forEach((el, i) => { if (i >= cardCount) el.classList.add("pv-reveal"); });
+  const reveals = [...pv.querySelectorAll(".pv-reveal")];
+
+  const CX = 156, PERSP = 2600, VIEW_W = 392, PAD = 40;
+  const BACK_X = 35.996, BACK_Y = 3.059;
+  const BLUR = { bottom: 2, topClosed: 6, topHover: 24 };
+  const BLUR_LAYERS = 8;
+  const UNFOLD_MS = () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? 300 : 1700);
+
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const clamp = (v) => Math.min(1, Math.max(0, v));
+  const seg = (t, a, b) => clamp((t - a) / (b - a));
+  const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+  const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const easeOutBack = (t, s) => 1 + (s + 1) * Math.pow(t - 1, 3) + s * Math.pow(t - 1, 2);
+  const mixArr = (A, B, t) => (t <= 0 ? A : A.map((v, i) => lerp(v, B[i], t)));
+  const mixRGB = (a, b, t) => a.map((v, i) => Math.round(lerp(v, b[i], t))).join(",");
+  const rgb = (s) => s.split(",").map(Number);
+
+  // Open front panel (Figma "Rectangle 46"), unflipped, bottom edge on the hinge.
+  const FRONT_OPEN = (() => {
+    const raw = [20,73.6, 20,53.4381,20,43.3572,23.9238,35.6563, 27.3752,28.8825,32.8825,23.3752,39.6563,19.9238,
+      47.3572,16,57.4381,16,77.6,16, 202.4, 222.562,16,232.643,16,240.344,19.9238, 247.117,23.3752,252.625,28.8825,256.076,35.6563,
+      260,43.3572,260,53.4381,260,73.6, 260,192.6, 260,206.041,260,212.762,257.384,217.896, 255.083,222.412,251.412,226.083,246.896,228.384,
+      241.762,231,235.041,231,221.6,231, 58.4, 44.9587,231,38.2381,231,33.1042,228.384, 28.5883,226.083,24.9168,222.412,22.6158,217.896,
+      20,212.762,20,206.041,20,192.6, 20,73.6];
+    const out = []; let i = 0;
+    for (const s of S.frontT.match(/[A-Z]#*/g)) {
+      const c = s[0];
+      if (c === "Z") continue;
+      if (c === "H") { out.push(raw[i++] + 15.996); continue; }
+      for (let j = 1; j < s.length; j += 2) out.push(raw[i++] + 15.996, raw[i++] + 5.059);
+    }
+    return out;
+  })();
+  // Close icon (Figma "Union" in Frame 163), in the folder's local frame.
+  const X_ICON = (() => {
+    const p = new Path2D("M139.75 102C161.841 102 179.75 119.909 179.75 142C179.75 164.091 161.841 182 139.75 182C117.659 182 99.75 164.091 99.75 142C99.7501 119.909 117.659 102 139.75 102ZM139.75 109.5C121.801 109.5 107.25 124.051 107.25 142C107.25 159.949 121.801 174.5 139.75 174.5C157.699 174.5 172.25 159.949 172.25 142C172.25 124.051 157.699 109.5 139.75 109.5ZM150.849 125.598C152.313 124.134 154.687 124.133 156.151 125.598C157.616 127.062 157.615 129.436 156.151 130.9L145.052 141.999L156.151 153.099C157.615 154.563 157.616 156.937 156.151 158.401C154.687 159.866 152.313 159.865 150.849 158.401L139.75 147.302L128.651 158.401C127.187 159.866 124.813 159.865 123.349 158.401C121.884 156.937 121.884 154.563 123.349 153.099L134.447 141.999L123.349 130.9C121.884 129.436 121.884 127.062 123.349 125.598C124.813 124.134 127.187 124.133 128.651 125.598L139.75 136.696L150.849 125.598Z");
+    const q = new Path2D(); q.addPath(p, new DOMMatrix().translate(15.746, -12.941)); return q;
+  })();
+  const HOLE = (() => { const p = new Path2D(); p.rect(-1500, -1500, 3300, 3300); return p; })();
+
+  function buildPath(tmpl, nums, map) {
+    let i = 0, x = 0, y = 0, out = "";
+    const pt = (px, py) => { const q = map ? map(px, py) : [px, py]; return q[0].toFixed(3) + " " + q[1].toFixed(3); };
+    for (const s of tmpl.match(/[A-Z]#*/g)) {
+      const c = s[0];
+      if (c === "Z") { out += "Z"; continue; }
+      if (c === "H") { x = nums[i++]; out += "L" + pt(x, y); continue; }
+      if (c === "V") { y = nums[i++]; out += "L" + pt(x, y); continue; }
+      out += c;
+      for (let j = 1; j < s.length; j += 2) { x = nums[i++]; y = nums[i++]; out += " " + pt(x, y); }
+    }
+    return out;
+  }
+
+  // ---- Cards: copies of the front page's Symmetra cards. The first three fly to the three images.
+  const cards = [...zf.querySelectorAll(".zf-card")].map((fig, i) => {
+    const st = fig.style, num = (n, d) => parseFloat(st.getPropertyValue(n)) || d;
+    const el = document.createElement("div");
+    el.className = "fc";
+    const shot = document.createElement("div");
+    shot.className = "fc-shot";
+    const thumb = fig.querySelector("img").cloneNode();
+    thumb.removeAttribute("class"); thumb.removeAttribute("style");
+    Object.assign(thumb.style, { inset: "0", width: "100%", height: "100%", objectFit: "cover" });
+    shot.appendChild(thumb);
+    const target = shots[i] || null;
+    const screenEl = target ? target.querySelector(".pv-screen") : null;
+    let bezel = null;
+    if (screenEl) {                                          // picture → phone screen, with the phone growing around it
+      shot.classList.add("is-morph"); el.style.overflow = "hidden";
+      const holder = document.createElement("div");
+      holder.innerHTML = '<svg class="fc-bezel" viewBox="0 0 396 810" aria-hidden="true"><use href="#pv-bezel"></use></svg>';
+      bezel = holder.firstChild; el.appendChild(bezel);
+    }
+    el.appendChild(shot);
+    fly.appendChild(el);
+    return { el, shot, thumb, target, phone: target ? target.querySelector(".pv-phone") : null, screenEl, bezel, hasPhoto: false, homeImg: fig.querySelector("img"), order: i, x: num("--x", 0) + BACK_X, y: num("--y", 0) + BACK_Y,
+             w: num("--w", 108), h: num("--h", 108), r: num("--r", 0) };
+  });
+
+  // ---- Photos from the PHOTOS list at the top of the file.
+  const pcfg = (window.PHOTOS || {})[pv.id.replace(/^pv-/, "")] || {};
+  const vio = "IntersectionObserver" in window
+    ? new IntersectionObserver((es) => es.forEach((e) => (e.isIntersecting ? e.target.play().catch(() => {}) : e.target.pause())))
+    : null;
+  (pcfg.files || []).forEach((name, i) => {
+    const fig = shots[i];
+    if (!name || !fig) return;
+    const url = (pcfg.folder ? pcfg.folder.replace(/\/$/, "") + "/" : "") + name;
+    const host = fig.querySelector(".pv-screen") || fig;
+    if (/\.(webm|mp4|mov)$/i.test(name)) {
+      const v = document.createElement("video");
+      Object.assign(v, { className: "pv-photo", muted: true, loop: true, playsInline: true, preload: "metadata", src: url });
+      host.appendChild(v);
+      if (vio) vio.observe(v);
+      return;
+    }
+    const probe = new Image();
+    probe.onload = () => {                                   // a missing file just leaves that frame empty
+      const img = document.createElement("img");
+      Object.assign(img, { className: "pv-photo", alt: "", decoding: "async", src: url });
+      host.appendChild(img);
+      const c = cards[i];
+      if (!c) return;
+      c.hasPhoto = true;
+      c.thumb.src = url;                                     // the flying card…
+      if (c.homeImg) {                                       // …and the card on the home page folder
+        c.homeImg.removeAttribute("class"); c.homeImg.removeAttribute("style");
+        c.homeImg.src = url;
+      }
+    };
+    probe.src = url;
+  });
+
+  // A frame with no file listed shows its folder card's own picture (inside the phone screen for phone frames),
+  // so each card's picture expands into its frame and the frame isn't empty.
+  cards.forEach((c, i) => {
+    if (!c.target || (pcfg.files || [])[i]) return;
+    const img = document.createElement("img");
+    Object.assign(img, { className: "pv-photo", alt: "", decoding: "async", src: c.thumb.src });
+    (c.screenEl || c.target).appendChild(img);
+    c.hasPhoto = true;
+  });
+
+  const frostLayers = Array.from({ length: BLUR_LAYERS }, () => frostEl.appendChild(document.createElement("div")));
+
+  // ---- State. t: 0 closed (front page) → 1 open (project page).
+  let t = 0, tTarget = 0, raf = 0, last = 0, closing = false, flyTimer = 0;
+  let docMode = false;        // open and scrolling with the window rather than inside the fixed box
+  const CLOSE_MS = 250;
+  let h0 = 0;                 // the front folder's hover peek when it was tapped; eased out early
+  let scrollFrom = 0;         // project page scroll at the moment of closing, eased out by the travel
+  let W = 0, H = 0, dpr = 1, k = 1;
+  let btnAt = [0, 0];
+
+  function frontFrame() {
+    const r = zf.getBoundingClientRect(), css = r.width / VIEW_W;
+    return { x: r.left + PAD * css, y: r.top + PAD * css, s: css };
+  }
+  function openFrame() {
+    let r = slot.getBoundingClientRect();
+    const s = r.width / 240;
+    if (matchMedia('(max-width: 760px)').matches) {   // phones: the folder settles in the middle of the first image, which grows over it
+      const sh = pv.querySelector('.pv-shot');
+      if (sh) { const q = sh.getBoundingClientRect(); r = { left: q.left + q.width / 2 - r.width / 2, top: q.top + q.height / 2 - r.height / 2 - 24 * s }; }
+    }
+    return { x: r.left - BACK_X * s, y: r.top + (docMode ? scrollY : pv.scrollTop) - BACK_Y * s, s };
+  }
+
+  function innerShadow(c, shape, dx, dy, sigma, color) {
+    const FAR = 4000, hole = new Path2D();
+    hole.addPath(HOLE); hole.addPath(shape);
+    c.save(); c.clip(shape);
+    c.shadowColor = color; c.shadowBlur = 2 * sigma * k;
+    c.shadowOffsetX = (dx + FAR) * k; c.shadowOffsetY = dy * k;
+    c.translate(-FAR, 0); c.fillStyle = "#000"; c.fill(hole, "evenodd");
+    c.restore();
+  }
+  function outerShadow(c, shape, dx, dy, sigma, color) {
+    const FAR = 4000, outside = new Path2D();
+    outside.addPath(HOLE); outside.addPath(shape);
+    c.save(); c.clip(outside, "evenodd");
+    c.shadowColor = color; c.shadowBlur = 2 * sigma * k;
+    c.shadowOffsetX = (dx + FAR) * k; c.shadowOffsetY = dy * k;
+    c.translate(-FAR, 0); c.fillStyle = "#000"; c.fill(shape);
+    c.restore();
+  }
+  function insideStroke(c, shape, a) {
+    c.save(); c.clip(shape); c.lineWidth = 2; c.strokeStyle = `rgba(0,0,0,${a})`; c.stroke(shape); c.restore();
+  }
+
+  function render() {
+    if (pv.hidden || !W || closing) return;
+    const hs = h0 * (1 - easeInOut(seg(t, 0, 0.3)));
+    const lift = -6 * hs;
+    const flip = easeInOut(seg(t, 0.02, 0.48));
+    const theta = Math.PI * flip, flipped = theta > Math.PI / 2;
+    const m = easeInOut(seg(t, 0.06, 0.46));         // closed front shape → open front shape
+    const bfill = easeInOut(seg(t, 0.03, 0.4));      // closed colouring → open
+    const camT = easeInOut(seg(t, 0.04, 0.7));       // travel to the project page spot
+    const hingeA = seg(flip, 0.55, 0.85);
+    const xA = easeInOut(seg(t, 0.3, 0.62));
+
+    pv.style.backgroundColor = `rgba(255,255,255,${easeInOut(seg(t, 0.05, 0.35)).toFixed(3)})`;
+    content.style.transform = scrollFrom ? `translateY(${(-scrollFrom * camT).toFixed(2)}px)` : "";
+
+    const A = frontFrame(), B = openFrame();
+    const sc = lerp(A.s, B.s, camT), ox = lerp(A.x, B.x, camT), oy = lerp(A.y, B.y, camT) + lift * sc;
+    k = sc * dpr;
+    const toX = (x) => ox + x * sc, toY = (y) => oy + y * sc;
+    const place = (c) => c.setTransform(k, 0, 0, k, ox * dpr, oy * dpr);
+
+    // Shapes, in the folder's local frame.
+    const back = new Path2D(buildPath(S.backT, mixArr(S.backA, S.backB, hs)));
+    const fnums = mixArr(mixArr(S.frontA, S.frontB, hs), FRONT_OPEN, m);
+    const hinge = lerp(lerp(236.059, 239.135, hs), 236.059, m);
+    const topLocal = lerp(lerp(70.059, 79.026, hs), 21.059, m);
+    const cs = Math.cos(theta), sn = Math.sin(theta);
+    const proj = (x, y) => { const d = hinge - y, f = PERSP / (PERSP - d * sn); return [CX + (x - CX) * f, hinge - d * cs * f]; };
+    const front = new Path2D(buildPath(S.frontT, fnums, proj));
+    const topY = proj(CX, topLocal)[1];
+
+    // ---- Under: drop shadow, back panel, close icon.
+    uctx.setTransform(1, 0, 0, 1, 0, 0);
+    uctx.clearRect(0, 0, under.width, under.height);
+    place(uctx);
+    const outline = new Path2D(); outline.addPath(back); outline.addPath(front);
+    const FAR = 4000;
+    uctx.save();
+    uctx.translate(-FAR, 0);
+    uctx.shadowColor = `rgba(0,0,0,${lerp(lerp(0.2, 0.14, hs), 0.08, camT).toFixed(3)})`;
+    uctx.shadowBlur = 2 * lerp(10, 18, hs) * k;
+    uctx.shadowOffsetX = FAR * k; uctx.shadowOffsetY = lerp(4, 20, hs) * k;
+    uctx.fillStyle = "#000"; uctx.fill(outline);
+    uctx.restore();
+    uctx.globalCompositeOperation = "destination-out"; uctx.fill(outline); uctx.globalCompositeOperation = "source-over";
+
+    const bg = uctx.createLinearGradient(0, lerp(3.059, 0, hs), 0, lerp(236.059, 239.132, hs));
+    bg.addColorStop(0, `rgb(${COLOR})`);
+    bg.addColorStop(1, `rgba(${mixRGB(DARK, rgb(COLOR), bfill)},${lerp(1, 0.24, bfill).toFixed(3)})`);
+    uctx.fillStyle = bg; uctx.fill(back);
+    innerShadow(uctx, back, 2, 4, 1.4, `rgba(${mixRGB(rgb(theme.backLight), [255, 255, 255], bfill)},0.36)`);
+    insideStroke(uctx, back, lerp(0.2, 0.1, bfill));
+    if (xA > 0) {
+      outerShadow(uctx, X_ICON, 0, -2, 1, `rgba(0,0,0,${(0.24 * xA).toFixed(3)})`);
+      outerShadow(uctx, X_ICON, 0, 2, 1, `rgba(255,255,255,${(0.4 * xA).toFixed(3)})`);
+      const xg = uctx.createLinearGradient(0, 89.059, 0, 169.059);
+      xg.addColorStop(0, `rgba(0,0,0,${(0.8 * 0.12 * xA).toFixed(4)})`);
+      xg.addColorStop(1, `rgba(0,0,0,${(0.2 * 0.12 * xA).toFixed(4)})`);
+      uctx.fillStyle = xg; uctx.fill(X_ICON);
+    }
+
+    // ---- Frosted glass behind the closed front panel; it thins out as the panel swings away.
+    const fade = 1 - seg(flip, 0.15, 0.45);
+    frostEl.style.display = fade > 0 ? "" : "none";
+    if (fade > 0) {
+      const clip = `path("${buildPath(S.frontT, fnums, (x, y) => { const q = proj(x, y); return [toX(q[0]), toY(q[1])]; })}")`;
+      const top = toY(topY), bot = toY(hinge);
+      const sB = (BLUR.bottom / 2) * fade, sT = (lerp(BLUR.topClosed, BLUR.topHover, hs) / 2) * fade;
+      const span = bot - top, step = span / (BLUR_LAYERS - 1);
+      let prev = 0;
+      frostLayers.forEach((layer, j) => {
+        const f = j / (BLUR_LAYERS - 1), sigma = lerp(sB, sT, f);
+        const add = Math.sqrt(Math.max(0, sigma * sigma - prev * prev));
+        prev = sigma;
+        layer.style.backdropFilter = layer.style.webkitBackdropFilter = `blur(${(add * sc).toFixed(2)}px)`;
+        layer.style.clipPath = clip;
+        if (j === 0) return;
+        const solidTo = bot - span * f;
+        layer.style.webkitMaskImage = layer.style.maskImage =
+          `linear-gradient(to bottom, #000 ${solidTo.toFixed(2)}px, transparent ${(solidTo + step).toFixed(2)}px)`;
+      });
+    }
+
+    // ---- Over: the front panel (and the hinge strip once it has swung down).
+    octx.setTransform(1, 0, 0, 1, 0, 0);
+    octx.clearRect(0, 0, over.width, over.height);
+    over.classList.toggle("is-flipped", flipped);
+    place(octx);
+    if (m < 1) {                                        // closed: radial wash, lighter at the hinge's centre
+      const a = 1 - m, rx = lerp(487.482, 487.911, hs), ry = Math.max(1, lerp(166, 160.105, hs) * Math.abs(cs));
+      const rg = octx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      rg.addColorStop(0, `rgba(${COLOR},${(0.6 * a).toFixed(3)})`);
+      rg.addColorStop(1, `rgba(${theme.edge || COLOR},${a.toFixed(3)})`);
+      const local = new Path2D();
+      local.addPath(front, new DOMMatrix().scale(1 / rx, 1 / ry).translate(-CX, -hinge));
+      octx.save(); octx.translate(CX, hinge); octx.scale(rx, ry); octx.fillStyle = rg; octx.fill(local); octx.restore();
+    }
+    if (m > 0) {                                        // open: 24% at the hinge → solid at the far edge
+      const lg = octx.createLinearGradient(0, hinge, 0, topY);
+      lg.addColorStop(0, `rgba(${COLOR},${(0.24 * m).toFixed(3)})`);
+      lg.addColorStop(1, `rgba(${COLOR},${m.toFixed(3)})`);
+      octx.fillStyle = lg; octx.fill(front);
+    }
+    const shade = 0.3 * sn;
+    if (shade > 0.005) { octx.fillStyle = `rgba(${DARK.join(",")},${shade.toFixed(3)})`; octx.fill(front); }
+    insideStroke(octx, front, lerp(0.2, 0.1, m));
+    const C = rgb(COLOR), GREY = [233, 233, 233];
+    innerShadow(octx, front, 0, 0, 9.15, `rgba(${mixRGB(C, GREY, m)},0.6)`);
+    innerShadow(octx, front, 2, lerp(6, -2, m), 2, `rgba(${mixRGB(rgb(theme.frontLight), [255, 255, 255], m)},0.52)`);
+    innerShadow(octx, front, 0, lerp(1.4, -1.4, m), 3, `rgba(${mixRGB(C, GREY, m)},0.8)`);
+    if (hingeA > 0) {
+      const hp = new Path2D(), x0 = CX - 101.25, y0 = hinge - 2;
+      hp.roundRect ? hp.roundRect(x0, y0, 202, 4, 2) : hp.rect(x0, y0, 202, 4);
+      const g = octx.createLinearGradient(0, y0, 0, y0 + 4);
+      g.addColorStop(0, `rgba(${COLOR},${(0.2 * hingeA).toFixed(3)})`);
+      g.addColorStop(1, `rgba(${COLOR},${(0.08 * hingeA).toFixed(3)})`);
+      octx.fillStyle = g; octx.fill(hp);
+      octx.save(); octx.lineWidth = 0.6; octx.strokeStyle = `rgba(0,0,0,${(0.1 * hingeA).toFixed(3)})`; octx.stroke(hp); octx.restore();
+    }
+
+    // ---- Cards.
+    const settled = t === 1 && tTarget === 1;
+    if (settled) {
+      // Hand over to the real frame with a short cross-fade rather than a hard cut, so no sub-pixel shift shows.
+      if (!fly.classList.contains("is-landed")) {
+        fly.classList.add("is-landed");
+        clearTimeout(flyTimer); flyTimer = setTimeout(() => { fly.style.display = "none"; }, 280);
+      }
+    } else {
+      clearTimeout(flyTimer); fly.classList.remove("is-landed"); fly.style.display = "";
+    }
+    cards.forEach((c) => {
+      const lx = CX + (c.x - CX) * (1 + 0.08 * hs), ly = c.y - 10 * hs;
+      const sx = toX(lx), sy = toY(ly), sw = c.w * sc, sh = c.h * sc;
+      const baseRot = c.r * (1 + 0.25 * hs);
+      const st = c.el.style;
+      if (!c.target) {
+        // No image for this card: it drops back into the folder and fades as the panel opens.
+        const e = easeInOut(seg(t, 0.04, 0.28));
+        Object.assign(st, { width: sw + "px", height: sh + "px", padding: 14 * sc + "px", borderRadius: 20 * sc + "px",
+          opacity: (1 - e).toFixed(3), boxShadow: `inset .5px 1px .6px #fff, 0 ${4 * sc}px ${4 * sc}px rgba(0,0,0,.14)` });
+        c.shot.style.borderRadius = 10 * sc + "px";
+        st.transform = `translate(${(sx - sw / 2).toFixed(2)}px, ${(sy - sh / 2 + 50 * sc * e).toFixed(2)}px) rotate(${baseRot}deg) scale(${1 - 0.15 * e})`;
+        return;
+      }
+      // One continuous transform on a single curve (no overshoot): the card becomes the box, its border
+      // grows into the box's border, the picture grows into the screen, and the phone grows out around it.
+      const raw = seg(t, 0.28 + 0.06 * c.order, Math.min(1, 0.74 + 0.06 * c.order));
+      const ez = easeInOut(raw);
+      const g = easeInOut(seg(raw, 0.3, 0.95));            // how far the phone has grown out
+      const to = c.hasPhoto ? 1 : 1 - easeInOut(seg(raw, 0.45, 0.9));   // the card picture's opacity
+      const hair = Math.min(1, sc);                        // the home card's hairline is scaled down with the card; match its weight
+      c.target.style.opacity = raw >= 1 ? "1" : "0";       // the real frame takes over only once this one has landed exactly
+      const r = c.target.getBoundingClientRect();
+      const cx = lerp(sx, r.left + r.width / 2, ez), cy = lerp(sy, r.top + r.height / 2, ez);
+      // The last stretch eases onto the whole-pixel positions the real layout paints at, so the hand-over is exact.
+      const sn = easeInOut(seg(raw, 0.8, 1));
+      const rl = Math.round(r.left), rt = Math.round(r.top);
+      const w0 = lerp(sw, r.width, ez), h0 = lerp(sh, r.height, ez);
+      const w = w0 + ((Math.round(r.right) - rl) - r.width) * sn;
+      const hh = h0 + ((Math.round(r.bottom) - rt) - r.height) * sn;
+      const rot = baseRot * (1 - ez);
+      Object.assign(st, { width: w.toFixed(2) + "px", height: hh.toFixed(2) + "px", opacity: raw >= 1 ? "0" : "1", backgroundColor: "#fff",
+        padding: c.screenEl ? "0" : lerp(14 * sc, 0, ez).toFixed(2) + "px", borderRadius: lerp(20 * sc, 8, ez).toFixed(2) + "px",
+        border: `1px solid rgba(224,224,224,${(0.6 * ez).toFixed(3)})`,
+        boxShadow: `inset .5px 1px .6px rgba(255,255,255,${(1 - ez).toFixed(3)}), 0 ${4 * sc}px ${(4 + 16 * ez) * sc}px rgba(0,0,0,${(0.14 * (1 - ez) + 0.06 * Math.sin(Math.PI * ez)).toFixed(3)})` });
+      if (c.screenEl) {
+        const sr = c.screenEl.getBoundingClientRect(), pr = c.phone.getBoundingClientRect(), ss = c.shot.style;
+        let px = lerp(14 * sc, sr.left - r.left, ez) - 1, py = lerp(14 * sc, sr.top - r.top, ez) - 1;   // −1: the box's border
+        let pw = lerp(sw - 28 * sc, sr.width, ez), ph = lerp(sh - 28 * sc, sr.height, ez);
+        const px0 = px, py0 = py, pw0 = pw, ph0 = ph;      // unsnapped, for deriving the phone
+        px += ((Math.round(sr.left) - rl - 1) - (sr.left - r.left - 1)) * sn;
+        py += ((Math.round(sr.top) - rt - 1) - (sr.top - r.top - 1)) * sn;
+        pw += ((Math.round(sr.right) - Math.round(sr.left)) - sr.width) * sn;
+        ph += ((Math.round(sr.bottom) - Math.round(sr.top)) - sr.height) * sn;
+        ss.left = px.toFixed(2) + "px"; ss.top = py.toFixed(2) + "px"; ss.width = pw.toFixed(2) + "px"; ss.height = ph.toFixed(2) + "px";
+        ss.borderRadius = `${lerp(10 * sc, 0.15 * sr.width, ez).toFixed(2)}px / ${lerp(10 * sc, 0.069 * sr.height, ez).toFixed(2)}px`;
+        ss.outline = `2px solid rgba(0,0,0,${g.toFixed(3)})`;
+        ss.setProperty("--pill", g.toFixed(3));
+        ss.setProperty("--bo", (hair * (1 - ez)).toFixed(3));  // the picture's hairline: unchanged at first, then fades as the card expands
+        ss.backgroundColor = to >= 1 ? "transparent" : `rgba(0,0,0,${(1 - to).toFixed(3)})`;   // black only appears as an unfilled picture fades
+        // The phone, sized from the picture's current rectangle and growing outward from its edges.
+        const mL = (sr.left - pr.left) / sr.width, mT = (sr.top - pr.top) / sr.height, mW = pr.width / sr.width, mH = pr.height / sr.height;
+        const bs = c.bezel.style;
+        const bl = lerp(px0, px0 - mL * pw0, g) + ((Math.round(pr.left) - rl - 1) - (pr.left - r.left - 1)) * sn;
+        const bt = lerp(py0, py0 - mT * ph0, g) + ((Math.round(pr.top) - rt - 1) - (pr.top - r.top - 1)) * sn;
+        const bw = lerp(pw0, mW * pw0, g) + ((Math.round(pr.right) - Math.round(pr.left)) - pr.width) * sn;
+        const bh = lerp(ph0, mH * ph0, g) + ((Math.round(pr.bottom) - Math.round(pr.top)) - pr.height) * sn;
+        bs.left = bl.toFixed(2) + "px"; bs.top = bt.toFixed(2) + "px"; bs.width = bw.toFixed(2) + "px"; bs.height = bh.toFixed(2) + "px";
+        bs.opacity = g.toFixed(3);
+      } else {
+        c.shot.style.borderRadius = lerp(10 * sc, 7, ez).toFixed(2) + "px";
+        c.shot.style.setProperty("--bo", (hair * (1 - ez)).toFixed(3));
+      }
+      c.thumb.style.opacity = to.toFixed(3);
+      const tx = cx - w0 / 2 + (rl - r.left) * sn, ty = cy - h0 / 2 + (rt - r.top) * sn;
+      st.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px)` + (rot > 0.005 || rot < -0.005 ? ` rotate(${rot.toFixed(3)}deg)` : "");   // no rotation once landed: images then resample like the real frame
+    });
+
+    // ---- Title, description and buttons fade in once the folder has opened.
+    const show = tTarget === 1 && t >= 0.5;        // a CSS transition does the fade, off the main thread
+    reveals.forEach((el) => el.classList.toggle("is-in", show));
+
+    // Close button over the back panel.
+    closeBtn.style.visibility = tTarget === 1 ? "" : "hidden";
+    btnAt = [toX(BACK_X), toY(BACK_Y)];
+    Object.assign(closeBtn.style, { width: 240 * sc + "px", height: 233 * sc + "px",
+      transform: `translate(${btnAt[0].toFixed(2)}px, ${btnAt[1].toFixed(2)}px)` });
+  }
+
+  function resize() {
+    W = innerWidth; H = innerHeight;
+    dpr = Math.min(2, Math.max(1, devicePixelRatio || 1));
+    const CH = Math.max(H, 900);                              // tall enough for the whole folder on any screen
+    const w = Math.round(W * dpr), hh = Math.round(CH * dpr);
+    under.style.height = over.style.height = CH + "px";
+    if (under.width !== w || under.height !== hh) { under.width = over.width = w; under.height = over.height = hh; }
+    render();
+  }
+
+  function frame(now) {
+    const dt = last ? Math.min(64, now - last) : 16;
+    last = now;
+    if (t !== tTarget) {
+      t += Math.sign(tTarget - t) * (dt / UNFOLD_MS());
+      t = tTarget === 1 ? Math.min(1, t) : Math.max(0, t);
+    }
+    if (t >= 0.3) h0 = 0;
+    render();
+    if (t === tTarget) {
+      raf = 0; last = 0;
+      if (t === 1) enterDoc();
+      if (t === 0) finishClose();
+      return;
+    }
+    raf = requestAnimationFrame(frame);
+  }
+  const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
+  function enterDoc() {
+    pv.classList.add('is-open');
+    if (docMode || closing) return;
+    docMode = true;
+    main.style.display = 'none';                 // the front page is hidden while a project is open, so the window scrolls the project
+    document.documentElement.classList.remove('pv-lock');
+    pv.classList.add('is-doc');
+    pv.scrollTop = 0;
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }
+
+  function open() {
+    if (tTarget === 1 || closing) return;
+    if (pv.hidden) {
+      const f = zf.__folder;
+      h0 = f ? f.h : 0;
+      document.title = pv.dataset.title || BASE_TITLE;      // the tab shows the project (folder) name while it is open
+      pv.hidden = false;
+      clearTimeout(flyTimer); fly.style.transition = "none"; fly.classList.remove("is-landed"); fly.style.display = "";
+      cards.forEach((c) => { c.el.style.transition = "none"; c.el.style.opacity = "1"; });
+      void fly.offsetWidth; fly.style.transition = ""; cards.forEach((c) => { c.el.style.transition = ""; });
+      pv.scrollTop = 0;                          // always start at the top, whatever was left from last time
+      content.style.transform = "";
+      document.documentElement.classList.add("pv-lock");
+      link.classList.add("is-launched");
+      main.inert = true;
+      if (f) f.seek(0);
+      resize();
+      history.pushState({ pv: pv.id }, "");
+    } else if (scrollFrom) {
+      // Re-opening mid-close: hand the leftover scroll back to the page.
+      const keep = scrollFrom * easeInOut(seg(t, 0.04, 0.7));
+      scrollFrom = 0; content.style.transform = "";
+      pv.classList.add("is-open"); pv.scrollTop = keep;
+    }
+    tTarget = 1;
+    closeBtn.focus({ preventScroll: true, focusVisible: false });
+    kick();
+  }
+  function close() {
+    if (tTarget === 0 || pv.hidden) return;
+    cancelAnimationFrame(raf); raf = 0; last = 0;
+    if (docMode) {                               // back to the fixed box, at the same scroll position, so the fade looks the same
+      const keep = scrollY;
+      docMode = false;
+      main.style.display = '';
+      pv.classList.remove('is-doc');
+      document.documentElement.classList.add('pv-lock');
+      pv.scrollTop = keep;
+    }
+    const r = link.getBoundingClientRect();
+    window.scrollTo({ top: matchMedia('(max-width: 760px)').matches ? 0 : scrollY + r.top + r.height / 2 - innerHeight / 2, behavior: "instant" });   // on phones the front page reopens at the top
+    tTarget = 0; closing = true;
+    closeBtn.style.visibility = "hidden";
+    link.classList.remove("is-launched");            // the front page's folder is right there as the view fades
+    pv.classList.add("is-closing");
+    setTimeout(finishClose, CLOSE_MS);
+  }
+  function finishClose() {
+    pv.classList.remove("is-closing", "is-open");
+    pv.scrollTop = 0;                            // reset while it still has a scroll box (hidden ones ignore this)
+    pv.hidden = true;
+    document.title = BASE_TITLE;
+    docMode = false; main.style.display = ''; pv.classList.remove('is-doc');
+    t = 0; closing = false;
+    reveals.forEach((el) => el.classList.remove("is-in"));      // reset while hidden, so nothing flashes on the next open
+    scrollFrom = 0; content.style.transform = "";
+    document.documentElement.classList.remove("pv-lock");
+    link.classList.remove("is-launched");
+    main.inert = false;
+    link.focus({ preventScroll: true, focusVisible: false });
+  }
+  // Closing goes through history so the browser's back button does the same thing.
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  const requestClose = () => (history.state && history.state.pv ? history.back() : close());
+
+  link.addEventListener("click", (e) => {
+    if (e.defaultPrevented) return;          // first tap on touch only peeks the folder
+    e.preventDefault();
+    open();
+  });
+  closeBtn.addEventListener("click", () => (tTarget === 1 ? requestClose() : open()));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && tTarget === 1) requestClose(); });
+  addEventListener("popstate", () => { if (tTarget === 1) close(); });
+  addEventListener("resize", resize);
+  if (document.fonts) document.fonts.ready.then(render, () => {});
+
+  const api = { open, close, seek(v) { if (pv.hidden) { pv.hidden = false; document.documentElement.classList.add("pv-lock"); link.classList.add("is-launched"); resize(); } t = tTarget = v; render(); } };
+  (window.__pvs = window.__pvs || {})[pv.id] = api;
+  if (pv.id === "pv-symmetra") window.__pv = api;
+}
+document.querySelectorAll(".pv[data-link]").forEach(mountProject);
+</script>
+<script>
+  // Scroll range: scrolled all the way up, the first folder's top sits TOP_LIFT px above the top of "Miguel Young";
+  // scrolled all the way down, the bottom of the last folder's name (e.g. "Holoramic 2025") lines up with the bottom
+  // of the Contact / Info buttons. The text block's size depends on the font and screen, so it's measured, not hard-coded.
+  (() => {
+    const intro = document.querySelector(".intro-inner");
+    const h1 = intro && intro.querySelector("h1"), actions = intro && intro.querySelector(".actions");
+    const list = document.querySelector(".projects");
+    if (!h1 || !actions || !list || !list.children.length) return;
+    const TOP_LIFT = 24;                                     // px the first folder sits above the top of the name (raise it for higher)
+    const wide = matchMedia("(min-width: 761px)");           // below this the intro just sits above the folders
+    const probe = document.createElement("canvas").getContext("2d");
+    function nameTop() {                                     // top of the letters (not the taller text box around them)
+      const cs = getComputedStyle(h1), r = h1.getBoundingClientRect();
+      probe.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const m = probe.measureText("M");
+      return m.fontBoundingBoxAscent == null ? r.top : r.top + (m.fontBoundingBoxAscent - m.actualBoundingBoxAscent);
+    }
+    function labelInkBottom(label) {                         // where the letters of the folder's name end (the baseline)
+      const cs = getComputedStyle(label), r = label.getBoundingClientRect();
+      probe.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const m = probe.measureText("H");
+      if (m.fontBoundingBoxAscent == null) return r.bottom;
+      const baseline = r.top + (r.height - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2 + m.fontBoundingBoxAscent;
+      return baseline + m.actualBoundingBoxDescent;
+    }
+    function apply() {
+      if (!h1.offsetHeight) return;                          // front page hidden (a project is open): keep the last measurements
+      if (!wide.matches) { list.style.removeProperty("--pad-top"); list.style.removeProperty("--pad-bottom"); return; }
+      const last = list.lastElementChild;
+      const below = last.getBoundingClientRect().bottom - labelInkBottom(last.querySelector(".label"));   // from the letters down to the item's end
+      list.style.setProperty("--pad-top", Math.max(0, nameTop() - TOP_LIFT).toFixed(2) + "px");
+      list.style.setProperty("--pad-bottom", Math.max(0, innerHeight - actions.getBoundingClientRect().bottom - below).toFixed(2) + "px");
+    }
+    apply();
+    addEventListener("resize", apply);
+    wide.addEventListener("change", apply);
+    if (document.fonts) document.fonts.ready.then(apply, () => {});
+    if ("ResizeObserver" in window) { const ro = new ResizeObserver(apply); ro.observe(h1); ro.observe(actions); }
+  })();
+</script>
+<script>
+  // Scroll dots: one per project, the current one stretched.
+  (() => {
+    const items = [...document.querySelectorAll(".projects > li")];
+    const wrap = document.querySelector(".dots-inner");
+    wrap.style.setProperty("--n", items.length);       // keeps the column centred however many projects there are
+    const dots = items.map((li) => {
+      const b = document.createElement("button");
+      b.className = "dot";
+      b.type = "button";
+      b.setAttribute("aria-label", li.querySelector(".project").getAttribute("aria-label"));
+      b.addEventListener("click", () => li.scrollIntoView({ block: "center" }));
+      wrap.appendChild(b);
+      return b;
+    });
+    const update = () => {
+      const mid = innerHeight / 2;
+      let best = 0, bestD = Infinity;
+      items.forEach((li, i) => {
+        const r = li.getBoundingClientRect();
+        const d = Math.abs(r.top + r.height / 2 - mid);
+        if (d < bestD) { bestD = d; best = i; }
+      });
+      dots.forEach((d, i) => d.setAttribute("aria-current", String(i === best)));
+    };
+    let queued = false;
+    addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; update(); }); } }, { passive: true });
+    addEventListener("resize", update);
+    update();
+  })();
+</script>
+<script>
+/* Mobile layout scale: --s is 1 at the 769px-wide front page design, --p is 1 at the 585px-wide project page design. */
+(function () {
+  function set() { var w = document.documentElement.clientWidth || innerWidth; document.documentElement.style.setProperty("--s", (w / 769).toFixed(4)); document.documentElement.style.setProperty("--p", (w / 585).toFixed(4)); }
+  set(); addEventListener("resize", set); addEventListener("orientationchange", set);
+})();
+</script>
+<script>
+/* Info button: pop-up under the button with the current time in London. */
+(function () {
+  var pop = document.createElement("div");
+  pop.className = "info-pop"; pop.setAttribute("role", "status");
+  pop.innerHTML = "<small>London, England</small><span class=\"info-row\"><span class=\"info-time\"></span><i class=\"info-dot\"></i></span>";
+  document.body.appendChild(pop);
+  var DATES = { daywise: "20/06/26", symmetra: "14/04/26", flutter: "24/02/26", mosaic: "29/12/25", holoramic: "19/11/25" };
+  var capEl = pop.querySelector("small"), timeEl = pop.querySelector(".info-time"), dotEl = pop.querySelector(".info-dot"), btn = null, timer = 0, hideT = 0, openedAt = 0, hovering = false, MOBILE = matchMedia("(max-width: 760px)");
+  function london() {
+    var now = new Date();
+    var f = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(now);
+    var h = +f.find(function (p) { return p.type === "hour"; }).value % 24, m = +f.find(function (p) { return p.type === "minute"; }).value;
+    var diff = (h * 60 + m) - (now.getUTCHours() * 60 + now.getUTCMinutes());
+    diff = ((diff + 720) % 1440 + 1440) % 1440 - 720;
+    dotEl.classList.toggle("on", h >= 7 && h < 20);
+    return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m + " " + (diff === 60 ? "BST" : "GMT");
+  }
+  function place() {
+    if (!btn) return;
+    var r = btn.getBoundingClientRect(), w = pop.offsetWidth;
+    var cx = r.left + r.width / 2, left = Math.max(8, Math.min(innerWidth - w - 8, cx - w / 2));
+    pop.style.left = left + "px"; pop.style.top = (r.bottom + 12) + "px"; pop.style.setProperty("--ax", (cx - left) + "px");
+  }
+  function tick() {
+    var pv = btn && btn.closest(".pv"), key = pv && pv.id.replace(/^pv-/, "");
+    if (key && DATES[key]) { capEl.textContent = "Date added"; timeEl.textContent = DATES[key]; dotEl.style.display = "none"; return; }
+    capEl.textContent = "London, England"; dotEl.style.display = ""; timeEl.textContent = london();
+  }
+  function open(b) { btn = b; tick(); place(); pop.classList.add("is-open"); clearInterval(timer); timer = setInterval(tick, 1000); clearTimeout(hideT); openedAt = Date.now(); hovering = !MOBILE.matches && !!(b.matches && b.matches(":hover")); if (MOBILE.matches) hideT = setTimeout(close, 2000); else if (!hovering) hideT = setTimeout(close, 3000); }
+  function close() { clearTimeout(hideT); btn = null; pop.classList.remove("is-open"); clearInterval(timer); }
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest('a[href="#info"]');
+    if (a) { e.preventDefault(); e.stopPropagation(); if (btn === a) close(); else open(a); return; }
+    if (!pop.contains(e.target)) close();
+  }, true);
+  document.addEventListener("pointerover", function (e) {
+    if (MOBILE.matches) return;
+    if (btn && e.target.closest && e.target.closest('a[href="#info"]') === btn) { hovering = true; clearTimeout(hideT); }
+  });
+  document.addEventListener("pointerout", function (e) {
+    if (MOBILE.matches) return;
+    if (!btn || !e.target.closest || e.target.closest('a[href="#info"]') !== btn) return;
+    var to = e.relatedTarget;
+    if (to && btn.contains(to)) return;
+    hovering = false; clearTimeout(hideT);
+    hideT = setTimeout(close, Math.max(0, 2000 - (Date.now() - openedAt)));
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
+  addEventListener("resize", place);
+  addEventListener("scroll", place, true);
+})();
+</script>
+<script>
+/* Presentation sections: cycle the slides every 1s, forever. */
+(function () {
+  var sets = Array.prototype.slice.call(document.querySelectorAll('.pv-pres'));
+  sets.forEach(function (el) { el._i = 0; });
+  setInterval(function () {
+    sets.forEach(function (el) {
+      var imgs = el.querySelectorAll(':scope > .pv-shot');
+      if (imgs.length < 2) return;
+      imgs[el._i].classList.remove('is-on');
+      el._i = (el._i + 1) % imgs.length;
+      imgs[el._i].classList.add('is-on');
+    });
+  }, 1000);
+})();
+</script>
+</body>
+</html>
