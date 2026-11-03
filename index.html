@@ -49,7 +49,12 @@ p { margin: 0; }
 .dots { flex: none; width: 4px; align-self: flex-start; }
 .intro-text { display: flex; flex-direction: column; gap: 20px; padding: 0 4px; }
 .intro h1 { margin: 0; font-size: 20px; font-weight: 600; line-height: normal; color: var(--ink); }
-.intro-bio { display: flex; flex-direction: column; gap: 17px; font-size: 14px; }
+.intro-bio { display: flex; flex-direction: column; gap: 17px; font-size: 14px; line-height: 1.4; }
+/* The line is a bottom border so it can run a little past the text on each side (padding), while the
+   matching negative margin keeps the text itself exactly where it was. */
+.bio-link { color: inherit; text-decoration: none; padding: 0 0 0 1px; margin: 0 0 0 -1px; border-bottom: 1px solid rgba(0, 0, 0, 0.14);
+  transition: border-color .15s; }
+.bio-link:hover, .bio-link:focus-visible { border-bottom-color: rgba(0, 0, 0, 0.5); }
 .actions { display: flex; gap: 8px; }
 .chip { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 79px; background: var(--chip);
   color: var(--ink-soft); font: 500 14px/normal var(--font); text-decoration: none; transition: background-color .15s; }
@@ -255,7 +260,7 @@ body { animation: page-fade-in .9s ease-out backwards; }
         <h1>Miguel Young</h1>
         <div class="intro-bio">
           <p>Graphic designer and visual artist based in England. With over three years of experience across brand identity, art direction, product design, and digital illustration.</p>
-          <p>I built and maintained an independent art platform of over 200,000 on all platforms, working with hundreds of clients across a broad range of projects.</p>
+          <p>I built and maintained an independent art platform of over <a class="bio-link" href="https://www.instagram.com/titocolorr" target="_blank" rel="noopener noreferrer">200,000</a> on all platforms, working with hundreds of clients across a broad range of projects.</p>
         </div>
       </div>
       <nav class="actions" aria-label="About">
