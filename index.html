@@ -253,7 +253,6 @@ html.pv-lock { overflow: hidden; }
    all fade in and rise together with the same gentle motion; the folders follow one another a beat apart.
    The classes are set by a small script in the head, so without scripts (or with reduced motion) nothing is hidden. */
 html.intro-text :is(.intro h1, .intro-bio, .intro .actions, .dots-inner, .project:not(.intro-skip)) { opacity: 0; }
-html.intro-text .project { pointer-events: none; }
 @keyframes intro-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes intro-up { from { transform: translate3d(0, var(--rise, 14px), 0); } to { transform: translate3d(0, 0, 0); } }
 html.intro-reveal :is(.intro h1, .intro-bio, .intro .actions, .dots-inner, .project:not(.intro-skip)) {
@@ -1463,7 +1462,6 @@ document.querySelectorAll(".pv[data-link]").forEach(mountProject);
     finished = true;
     root.classList.remove("intro-text", "intro-reveal");
     document.querySelectorAll(".project").forEach((l) => { l.classList.remove("intro-skip"); l.style.removeProperty("--d"); });
-    if (main) main.inert = false;
     dispatchEvent(new Event("resize"));           // re-measure anything that was measured while things were moving
   }
   function start() {
@@ -1481,7 +1479,6 @@ document.querySelectorAll(".pv[data-link]").forEach(mountProject);
   }
 
   try {
-    if (main) main.inert = true;                  // no hovering or opening folders until the intro is over
     const waits = [];
     document.querySelectorAll(".project .zf img").forEach((img) => {
       if (!img.complete) waits.push(new Promise((res) => { img.addEventListener("load", res, { once: true }); img.addEventListener("error", res, { once: true }); }));
